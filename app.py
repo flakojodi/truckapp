@@ -49,3 +49,4 @@ export default function TruckGPSApp() {
     </div>
   );
 }
+st.markdown("[🚛 Launch Live GPS Map](gps.html)", unsafe_allow_html=True)
