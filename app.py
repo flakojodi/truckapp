@@ -15,10 +15,10 @@ Use this tool to:
 - 📍 Track your real-time GPS location
 """)
 
-# Initialize route data (will be passed into HTML)
+# Initialize route data
 route_coords = None
 
-# Route input form
+# Route form
 st.markdown("### 🛣️ Truck-Safe Route Planner")
 start = st.text_input("Start location (e.g. Chicago, IL)")
 end = st.text_input("Destination (e.g. Indianapolis, IN)")
@@ -47,18 +47,19 @@ if route_btn and start and end:
         route_coords = route['features'][0]['geometry']['coordinates']
 
     except Exception as e:
-        st.error("❌ Failed to calculate route. Please check city names or try again.")
+        st.error("❌ Failed to calculate route.")
         st.exception(e)
 
-# Load static HTML and inject route into JS
+# Load HTML and inject JS route block
 with open("public/gps.html", "r", encoding="utf-8") as f:
     html_template = f.read()
 
-# Inject route as JS variable if it exists
+# Replace placeholder with real JS route variable
 if route_coords:
     route_json = json.dumps(route_coords)
-    html_template = html_template.replace("__ROUTE_DATA__", route_json)
+    injected = f"<script>const routeData = {route_json};</script>"
 else:
-    html_template = html_template.replace("__ROUTE_DATA__", "null")
+    injected = "<script>const routeData = null;</script>"
 
-components.html(html_template, height=600, scrolling=False)
+html_final = html_template.replace("<!-- __ROUTE_DATA_PLACEHOLDER__ -->", injected)
+components.html(html_final, height=600, scrolling=False)
