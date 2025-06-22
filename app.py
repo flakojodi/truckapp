@@ -1,12 +1,10 @@
 import streamlit as st
 
-st.set_page_config(page_title="Truck Route App", layout="centered")
-
+st.set_page_config(page_title="Truck GPS App", layout="centered")
 st.title("🚛 Truck Route Planner")
 
-st.markdown("Use this tool to plan safe truck routes with bridge height, weight, and clearance in mind.")
+st.markdown("Use this tool to plan truck-safe routes and track your real-time location.")
 
-# GPS map link
-st.markdown("### Real-Time GPS Tracker")
-st.markdown("[📍 Launch Live GPS Map](gps.html)", unsafe_allow_html=True)
-st.markdown("[📍 Launch GPS Tracker](https://gps-mapbox-app.vercel.app)", unsafe_allow_html=True)
+# Embed GPS map (hosted inside an iframe)
+st.markdown("### Real-Time GPS Map (Built-In)")
+st.components.v1.iframe("https://flakojodi.github.io/truckapp/gps.html", height=600, scrolling=True)
