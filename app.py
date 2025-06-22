@@ -1,52 +1,11 @@
-// truck-gps-app (React + Mapbox)
-// MVP: Real-time location tracking + route rendering
+import streamlit as st
 
-import { useEffect, useState } from 'react';
-import mapboxgl from 'mapbox-gl';
-import 'mapbox-gl/dist/mapbox-gl.css';
+st.set_page_config(page_title="Truck Route App", layout="centered")
 
-mapboxgl.accessToken = 'pk.eyJ1IjoiZmxha29qb2RpIiwiYSI6ImNtYzdsdTlpZzBsanoybHEyamVva2Fpb2sifQ.zqpdCfGvzD0YCCCExKXsLg'; // ✅ Your token
+st.title("🚛 Truck Route Planner")
 
-export default function TruckGPSApp() {
-  const [map, setMap] = useState(null);
-  const [userCoords, setUserCoords] = useState(null);
+st.markdown("Use this tool to plan safe truck routes with bridge height, weight, and clearance in mind.")
 
-  useEffect(() => {
-    if (!navigator.geolocation) {
-      alert('Geolocation is not supported by your browser.');
-      return;
-    }
-
-    navigator.geolocation.getCurrentPosition(position => {
-      const { latitude, longitude } = position.coords;
-      setUserCoords([longitude, latitude]);
-    });
-  }, []);
-
-  useEffect(() => {
-    if (!userCoords) return;
-
-    const initMap = new mapboxgl.Map({
-      container: 'map',
-      style: 'mapbox://styles/mapbox/streets-v11',
-      center: userCoords,
-      zoom: 13
-    });
-
-    new mapboxgl.Marker({ color: 'green' })
-      .setLngLat(userCoords)
-      .setPopup(new mapboxgl.Popup().setText('You are here'))
-      .addTo(initMap);
-
-    setMap(initMap);
-
-    return () => initMap.remove();
-  }, [userCoords]);
-
-  return (
-    <div className="w-full h-screen">
-      <div id="map" className="w-full h-full rounded-xl shadow-lg" />
-    </div>
-  );
-}
-st.markdown("[🚛 Launch Live GPS Map](gps.html)", unsafe_allow_html=True)
+# GPS map link
+st.markdown("### Real-Time GPS Tracker")
+st.markdown("[📍 Launch Live GPS Map](gps.html)", unsafe_allow_html=True)
