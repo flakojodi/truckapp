@@ -9,3 +9,4 @@ st.markdown("Use this tool to plan safe truck routes with bridge height, weight,
 # GPS map link
 st.markdown("### Real-Time GPS Tracker")
 st.markdown("[📍 Launch Live GPS Map](gps.html)", unsafe_allow_html=True)
+st.markdown("[📍 Launch GPS Tracker](https://gps-mapbox-app.vercel.app)", unsafe_allow_html=True)
