@@ -2,7 +2,7 @@
 <html>
 <head>
   <meta charset="utf-8" />
-  <title>Live Truck GPS</title>
+  <title>Live Truck GPS + Route</title>
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <script src="https://api.mapbox.com/mapbox-gl-js/v2.13.0/mapbox-gl.js"></script>
   <link href="https://api.mapbox.com/mapbox-gl-js/v2.13.0/mapbox-gl.css" rel="stylesheet" />
@@ -17,31 +17,60 @@
   <script>
     mapboxgl.accessToken = 'pk.eyJ1IjoiZmxha29qb2RpIiwiYSI6ImNtYzdsdTlpZzBsanoybHEyamVva2Fpb2sifQ.zqpdCfGvzD0YCCCExKXsLg';
 
-    if (!navigator.geolocation) {
-      alert('Geolocation not supported.');
-    } else {
-      navigator.geolocation.getCurrentPosition(success, error);
-    }
+    const map = new mapboxgl.Map({
+      container: 'map',
+      style: 'mapbox://styles/mapbox/streets-v11',
+      center: [-87.6298, 41.8781], // default: Chicago
+      zoom: 13
+    });
 
-    function success(position) {
-      const userCoords = [position.coords.longitude, position.coords.latitude];
+    // Get user's current location
+    if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(position => {
+        const userCoords = [position.coords.longitude, position.coords.latitude];
 
-      const map = new mapboxgl.Map({
-        container: 'map',
-        style: 'mapbox://styles/mapbox/streets-v11',
-        center: userCoords,
-        zoom: 14
+        map.setCenter(userCoords);
+        new mapboxgl.Marker({ color: 'green' })
+          .setLngLat(userCoords)
+          .setPopup(new mapboxgl.Popup().setText('You are here'))
+          .addTo(map);
       });
-
-      new mapboxgl.Marker({ color: 'green' })
-        .setLngLat(userCoords)
-        .setPopup(new mapboxgl.Popup().setText('You are here'))
-        .addTo(map);
     }
 
-    function error(err) {
-      alert('Unable to retrieve location. ' + err.message);
-    }
+    // Load route.json (must be hosted or served from backend)
+    fetch('route.json')
+      .then(res => res.json())
+      .then(routeCoords => {
+        map.on('load', () => {
+          map.addSource('route', {
+            type: 'geojson',
+            data: {
+              type: 'Feature',
+              geometry: {
+                type: 'LineString',
+                coordinates: routeCoords
+              }
+            }
+          });
+
+          map.addLayer({
+            id: 'route-line',
+            type: 'line',
+            source: 'route',
+            layout: {
+              'line-join': 'round',
+              'line-cap': 'round'
+            },
+            paint: {
+              'line-color': '#0074D9',
+              'line-width': 6
+            }
+          });
+        });
+      })
+      .catch(err => {
+        console.error('Route file not found or invalid:', err);
+      });
   </script>
 </body>
 </html>
