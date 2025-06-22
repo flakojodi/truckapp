@@ -14,6 +14,8 @@
 <body>
   <div id="map"></div>
 
+  <!-- __ROUTE_DATA_PLACEHOLDER__ -->
+
   <script>
     mapboxgl.accessToken = 'pk.eyJ1IjoiZmxha29qb2RpIiwiYSI6ImNtYzdsdTlpZzBsanoybHEyamVva2Fpb2sifQ.zqpdCfGvzD0YCCCExKXsLg';
 
@@ -24,7 +26,7 @@
       zoom: 13
     });
 
-    // Show user location
+    // Show current location
     if (navigator.geolocation) {
       navigator.geolocation.getCurrentPosition(position => {
         const userCoords = [position.coords.longitude, position.coords.latitude];
@@ -36,9 +38,7 @@
       });
     }
 
-    // Route injected by Python
-    const routeData = __ROUTE_DATA__;
-
+    // Draw route if it exists
     if (routeData) {
       map.on('load', () => {
         map.addSource('route', {
