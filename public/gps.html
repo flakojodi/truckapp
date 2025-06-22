@@ -24,11 +24,10 @@
       zoom: 13
     });
 
-    // Get user's location
+    // Show user location
     if (navigator.geolocation) {
       navigator.geolocation.getCurrentPosition(position => {
         const userCoords = [position.coords.longitude, position.coords.latitude];
-
         map.setCenter(userCoords);
         new mapboxgl.Marker({ color: 'green' })
           .setLngLat(userCoords)
@@ -37,40 +36,37 @@
       });
     }
 
-    // Load route line from route.json
-    fetch('route.json')
-      .then(res => res.json())
-      .then(routeCoords => {
-        map.on('load', () => {
-          map.addSource('route', {
-            type: 'geojson',
-            data: {
-              type: 'Feature',
-              geometry: {
-                type: 'LineString',
-                coordinates: routeCoords
-              }
-            }
-          });
+    // Route injected by Python
+    const routeData = __ROUTE_DATA__;
 
-          map.addLayer({
-            id: 'route-line',
-            type: 'line',
-            source: 'route',
-            layout: {
-              'line-join': 'round',
-              'line-cap': 'round'
-            },
-            paint: {
-              'line-color': '#0074D9',
-              'line-width': 6
+    if (routeData) {
+      map.on('load', () => {
+        map.addSource('route', {
+          type: 'geojson',
+          data: {
+            type: 'Feature',
+            geometry: {
+              type: 'LineString',
+              coordinates: routeData
             }
-          });
+          }
         });
-      })
-      .catch(err => {
-        console.error('Route file not found or invalid:', err);
+
+        map.addLayer({
+          id: 'route-line',
+          type: 'line',
+          source: 'route',
+          layout: {
+            'line-join': 'round',
+            'line-cap': 'round'
+          },
+          paint: {
+            'line-color': '#0074D9',
+            'line-width': 6
+          }
+        });
       });
+    }
   </script>
 </body>
 </html>
