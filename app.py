@@ -1,62 +1,51 @@
-import streamlit as st
-import openrouteservice
-import pandas as pd
+// truck-gps-app (React + Mapbox)
+// MVP: Real-time location tracking + route rendering
 
-# ORS key + client
-ORS_API_KEY = "5b3ce3597851110001cf624888df041edc1b46f495f01545515f1ace"
-client = openrouteservice.Client(key=ORS_API_KEY)
+import { useEffect, useState } from 'react';
+import mapboxgl from 'mapbox-gl';
+import 'mapbox-gl/dist/mapbox-gl.css';
 
-st.set_page_config(page_title="Truck Route Planner", layout="centered")
-st.title("🚛 Truck Route Planner")
+mapboxgl.accessToken = 'pk.eyJ1IjoiZmxha29qb2RpIiwiYSI6ImNtYzdsdTlpZzBsanoybHEyamVva2Fpb2sifQ.zqpdCfGvzD0YCCCExKXsLg'; // ✅ Your token
 
-start = st.text_input("Start Address", "Chicago, IL")
-end = st.text_input("End Address", "Indianapolis, IN")
+export default function TruckGPSApp() {
+  const [map, setMap] = useState(null);
+  const [userCoords, setUserCoords] = useState(null);
 
-def geocode(address):
-    try:
-        res = client.pelias_search(text=address)
-        coords = res["features"][0]["geometry"]["coordinates"]
-        return coords  # [lon, lat]
-    except Exception as e:
-        st.error(f"Geocoding failed: {e}")
-        return None
+  useEffect(() => {
+    if (!navigator.geolocation) {
+      alert('Geolocation is not supported by your browser.');
+      return;
+    }
 
-def get_route(start_coords, end_coords):
-    try:
-        route = client.directions(
-            coordinates=[start_coords, end_coords],
-            profile="driving-car",
-            format="geojson"
-        )
-        return route["features"][0]["geometry"]["coordinates"]
-    except Exception as e:
-        st.error(f"Routing failed: {e}")
-        return None
+    navigator.geolocation.getCurrentPosition(position => {
+      const { latitude, longitude } = position.coords;
+      setUserCoords([longitude, latitude]);
+    });
+  }, []);
 
-if st.button("🛣️ Generate Safe Preview"):
-    start_coords = geocode(start)
-    end_coords = geocode(end)
+  useEffect(() => {
+    if (!userCoords) return;
 
-    if not start_coords or not end_coords:
-        st.error("❌ One or both locations could not be found.")
-        st.stop()
+    const initMap = new mapboxgl.Map({
+      container: 'map',
+      style: 'mapbox://styles/mapbox/streets-v11',
+      center: userCoords,
+      zoom: 13
+    });
 
-    route = get_route(start_coords, end_coords)
+    new mapboxgl.Marker({ color: 'green' })
+      .setLngLat(userCoords)
+      .setPopup(new mapboxgl.Popup().setText('You are here'))
+      .addTo(initMap);
 
-    if not route:
-        st.error("❌ Could not generate route.")
-        st.stop()
+    setMap(initMap);
 
-    # Display only a sample of route points for safety
-    coords_df = pd.DataFrame(
-        [[coord[1], coord[0]] for coord in route[::50]],  # Every 50th point to reduce load
-        columns=["lat", "lon"]
-    )
+    return () => initMap.remove();
+  }, [userCoords]);
 
-    st.success("✅ Route preview loaded (simplified).")
-    st.map(coords_df)
-
-    # Optional: let user download the raw coords
-    if st.checkbox("Show raw route data"):
-        st.write("Full Route Coordinates (raw):")
-        st.json(route)
+  return (
+    <div className="w-full h-screen">
+      <div id="map" className="w-full h-full rounded-xl shadow-lg" />
+    </div>
+  );
+}
