@@ -1,10 +1,24 @@
 import streamlit as st
+import streamlit.components.v1 as components
 
-st.set_page_config(page_title="Truck GPS App", layout="centered")
+# Page config
+st.set_page_config(page_title="Truck Route App", layout="centered")
+
+# Title
 st.title("🚛 Truck Route Planner")
 
-st.markdown("Use this tool to plan truck-safe routes and track your real-time location.")
+# Instructions
+st.markdown("""
+Use this tool to:
+- Plan truck-safe routes
+- Avoid low bridges and weight limits
+- Track your live GPS location
+""")
 
-# Embed GPS map (hosted inside an iframe)
-st.markdown("### Real-Time GPS Map (Built-In)")
-st.components.v1.iframe("https://flakojodi.github.io/truckapp/gps.html", height=600, scrolling=True)
+# GPS Embed Section
+st.markdown("### 📍 Real-Time GPS Tracker (Live)")
+components.iframe("https://flakojodi.github.io/truckapp/gps.html", height=600, scrolling=True)
+
+# Optional: Add routing section header for next step
+st.markdown("### 🧭 Truck-Safe Route Planner (Coming Soon)")
+st.info("Start and destination routing will appear here in the next update.")
