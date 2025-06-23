@@ -52,8 +52,7 @@ if st.button("🚚 Calculate Route"):
             json.dump(steps, f)
 
         st.success("✅ Route calculated and saved!")
-        st.experimental_rerun()
-
+        
     else:
         st.error(f"❌ Error from Mapbox: {response.text}")
 
