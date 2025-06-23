@@ -8,11 +8,9 @@ with open("route.json", "r") as f:
 
 # Extract coordinates
 route_coords = route_data["features"][0]["geometry"]["coordinates"]
-
-# Pass the coordinates into JavaScript
 route_coords_js = json.dumps(route_coords)
 
-# Inject the HTML with JS and Mapbox
+# Inject the HTML/Mapbox map
 components.html(f"""
 <!DOCTYPE html>
 <html>
@@ -40,14 +38,14 @@ components.html(f"""
     }});
 
     map.on('load', () => {{
-        // Add GPS marker
+        // GPS Marker
         navigator.geolocation.getCurrentPosition(pos => {{
             new mapboxgl.Marker({{color: "red"}})
                 .setLngLat([pos.coords.longitude, pos.coords.latitude])
                 .addTo(map);
         }});
 
-        // Add route as line
+        // Route Line
         map.addSource('route', {{
             'type': 'geojson',
             'data': {{
@@ -68,8 +66,8 @@ components.html(f"""
                 'line-cap': 'round'
             }},
             'paint': {{
-                'line-color': '#0074D9',
-                'line-width': 5
+                'line-color': '#00FF99',
+                'line-width': 6
             }}
         }});
     }});
