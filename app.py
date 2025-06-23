@@ -90,9 +90,8 @@ if st.button("🚚 Generate Route"):
 if os.path.exists("route.json") and os.path.exists("steps.json") and os.path.exists("info.json"):
     st.markdown("### 🧭 Navigation Controls")
     if st.button("▶️ Start Navigation"):
-        st.session_state.nav_started = True
-        st.experimental_rerun()
-
+    st.session_state.nav_started = True
+    st.success("✅ Navigation started! Please refresh the page manually.")
     with open("info.json") as f:
         info = json.load(f)
 
