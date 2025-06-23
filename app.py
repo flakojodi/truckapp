@@ -1,9 +1,9 @@
 import streamlit as st
 import json
 import requests
-import os  # ✅ ADD THIS
-import streamlit.components.v1 as components
+import os
 import urllib.parse
+import streamlit.components.v1 as components
 
 st.set_page_config(layout="wide")
 st.title("🚛 Truck-Safe Live GPS Navigation")
@@ -11,10 +11,9 @@ st.title("🚛 Truck-Safe Live GPS Navigation")
 MAPBOX_TOKEN = "pk.eyJ1IjoiZmxha29qb2RpIiwiYSI6ImNtYzlrNW5iZzE1YmoydW9ldnZmNTZpdnkifQ.GgxPKZLKgt0DJ5L9ggYP9A"
 
 # ======================
-# 📍 ADDRESS INPUT
+# 📍 Address Input
 # ======================
 st.subheader("Enter Start and Destination")
-
 col1, col2 = st.columns(2)
 with col1:
     start_address = st.text_input("Start Location", "Chicago, IL")
@@ -22,7 +21,7 @@ with col2:
     end_address = st.text_input("Destination", "Oak Lawn, IL")
 
 # ======================
-# 🔁 Geocode addresses
+# 🌐 Geocode Function
 # ======================
 def geocode(address):
     url = f"https://api.mapbox.com/geocoding/v5/mapbox.places/{urllib.parse.quote(address)}.json"
@@ -33,14 +32,14 @@ def geocode(address):
     return coords  # [lng, lat]
 
 # ======================
-# 📦 Route Generator
+# 📦 Generate Route
 # ======================
 if st.button("🚚 Generate Route"):
     try:
         start_coords = geocode(start_address)
         end_coords = geocode(end_address)
 
-        url = f"https://api.mapbox.com/directions/v5/mapbox/driving/{start_coords[0]},{start_coords[1]};{end_coords[0]},{end_coords[1]}"
+        directions_url = f"https://api.mapbox.com/directions/v5/mapbox/driving/{start_coords[0]},{start_coords[1]};{end_coords[0]},{end_coords[1]}"
         params = {
             "alternatives": "false",
             "geometries": "geojson",
@@ -49,10 +48,10 @@ if st.button("🚚 Generate Route"):
             "access_token": MAPBOX_TOKEN
         }
 
-        res = requests.get(url, params=params)
+        res = requests.get(directions_url, params=params)
         data = res.json()
 
-        # Save route line
+        # Save route
         route_geo = {
             "type": "FeatureCollection",
             "features": [{
@@ -66,18 +65,17 @@ if st.button("🚚 Generate Route"):
 
         with open("route.json", "w") as f:
             json.dump(route_geo, f)
-
         with open("steps.json", "w") as f:
             json.dump(steps, f)
 
-        st.success("✅ Route created! Scroll to view map + voice directions.")
+        st.success("✅ Route created! Scroll to see map and voice navigation.")
     except Exception as e:
-        st.error(f"❌ Failed: {e}")
+        st.error(f"❌ Error: {e}")
 
 # ======================
-# 🗺️ Map + Voice Nav
+# 🗺️ Display Map + Voice Nav
 # ======================
-if "route.json" in os.listdir() and "steps.json" in os.listdir():
+if os.path.exists("route.json") and os.path.exists("steps.json"):
     with open("route.json") as f:
         route_data = json.load(f)
     route_coords = route_data["features"][0]["geometry"]["coordinates"]
@@ -85,7 +83,6 @@ if "route.json" in os.listdir() and "steps.json" in os.listdir():
 
     with open("steps.json") as f:
         steps = json.load(f)
-
     steps_js = json.dumps([
         {
             "instruction": step["maneuver"]["instruction"],
@@ -111,7 +108,6 @@ if "route.json" in os.listdir() and "steps.json" in os.listdir():
 <div id='map'></div>
 <script>
   mapboxgl.accessToken = '{MAPBOX_TOKEN}';
-
   const map = new mapboxgl.Map({{
     container: 'map',
     style: 'mapbox://styles/mapbox/navigation-night-v1',
@@ -124,34 +120,33 @@ if "route.json" in os.listdir() and "steps.json" in os.listdir():
   let stepIndex = 0;
 
   map.on('load', () => {{
-    // Route line
     map.addSource('route', {{
-      'type': 'geojson',
-      'data': {{
-        'type': 'Feature',
-        'geometry': {{
-          'type': 'LineString',
-          'coordinates': routeCoords
+      type: 'geojson',
+      data: {{
+        type: 'Feature',
+        geometry: {{
+          type: 'LineString',
+          coordinates: routeCoords
         }}
       }}
     }});
 
     map.addLayer({{
-      'id': 'route-line',
-      'type': 'line',
-      'source': 'route',
-      'layout': {{
+      id: 'route-line',
+      type: 'line',
+      source: 'route',
+      layout: {{
         'line-join': 'round',
         'line-cap': 'round'
       }},
-      'paint': {{
+      paint: {{
         'line-color': '#00FF99',
         'line-width': 5
       }}
     }});
   }});
 
-  // TTS function
+  // TTS voice
   function speak(text) {{
     const msg = new SpeechSynthesisUtterance(text);
     msg.rate = 1;
@@ -177,16 +172,14 @@ if "route.json" in os.listdir() and "steps.json" in os.listdir():
     const lat = pos.coords.latitude;
 
     if (!userMarker) {{
-      userMarker = new mapboxgl.Marker({{color: 'red'}})
+      userMarker = new mapboxgl.Marker({{ color: 'red' }})
         .setLngLat([lng, lat])
         .addTo(map);
     }} else {{
       userMarker.setLngLat([lng, lat]);
     }}
 
-    map.setCenter([lng, lat]);
-
-    // Voice directions
+    // voice instructions
     if (stepIndex < steps.length) {{
       const step = steps[stepIndex];
       const [stepLng, stepLat] = step.location;
@@ -199,13 +192,12 @@ if "route.json" in os.listdir() and "steps.json" in os.listdir():
     }}
   }}, err => console.error(err), {{
     enableHighAccuracy: true,
-    maximumAge: 1000,
+    maximumAge: 0,
     timeout: 5000
   }});
 </script>
 </body>
 </html>
 """, height=650)
-
 else:
-    st.info("⚠️ Enter addresses and generate route to activate live map + voice navigation.")
+    st.info("⚠️ No route yet. Enter start and destination above to begin.")
