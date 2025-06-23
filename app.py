@@ -1,7 +1,7 @@
-
 import streamlit as st
 import json
 import requests
+import os  # ✅ ADD THIS
 import streamlit.components.v1 as components
 import urllib.parse
 
