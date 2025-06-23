@@ -1,65 +1,79 @@
 import streamlit as st
-import streamlit.components.v1 as components
-import openrouteservice
 import json
+import streamlit.components.v1 as components
 
-# Set up Streamlit config
-st.set_page_config(page_title="Truck Route App", layout="centered")
-st.title("🚛 Truck Route Planner")
+# Load the route from route.json
+with open("route.json", "r") as f:
+    route_data = json.load(f)
 
-# Intro text
-st.markdown("""
-Use this tool to:
-- 🧭 Plan truck-safe routes
-- 🚧 Avoid low bridges and weight restrictions
-- 📍 Track your real-time GPS location
-""")
+# Extract coordinates
+route_coords = route_data["features"][0]["geometry"]["coordinates"]
 
-# Initialize route data
-route_coords = None
+# Pass the coordinates into JavaScript
+route_coords_js = json.dumps(route_coords)
 
-# Route form
-st.markdown("### 🛣️ Truck-Safe Route Planner")
-start = st.text_input("Start location (e.g. Chicago, IL)")
-end = st.text_input("Destination (e.g. Indianapolis, IN)")
-route_btn = st.button("Calculate Route")
+# Inject the HTML with JS and Mapbox
+components.html(f"""
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8" />
+    <title>Truck GPS Map</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <script src='https://api.mapbox.com/mapbox-gl-js/v2.15.0/mapbox-gl.js'></script>
+    <link href='https://api.mapbox.com/mapbox-gl-js/v2.15.0/mapbox-gl.css' rel='stylesheet' />
+    <style>
+        body {{ margin: 0; padding: 0; }}
+        #map {{ width: 100%; height: 600px; }}
+    </style>
+</head>
+<body>
+<div id='map'></div>
+<script>
+    mapboxgl.accessToken = 'YOUR_MAPBOX_ACCESS_TOKEN';
 
-if route_btn and start and end:
-    try:
-        client = openrouteservice.Client(
-            key="5b3ce3597851110001cf624888df041edc1b46f495f01545515f1ace"
-        )
-        geocode_start = client.pelias_search(text=start)['features'][0]['geometry']['coordinates']
-        geocode_end = client.pelias_search(text=end)['features'][0]['geometry']['coordinates']
+    const map = new mapboxgl.Map({{
+        container: 'map',
+        style: 'mapbox://styles/mapbox/streets-v11',
+        center: {route_coords_js}[0],
+        zoom: 12
+    }});
 
-        route = client.directions(
-            coordinates=[geocode_start, geocode_end],
-            profile='driving-hgv',
-            format='geojson'
-        )
+    map.on('load', () => {{
+        // Add GPS marker
+        navigator.geolocation.getCurrentPosition(pos => {{
+            new mapboxgl.Marker({{color: "red"}})
+                .setLngLat([pos.coords.longitude, pos.coords.latitude])
+                .addTo(map);
+        }});
 
-        st.success("✅ Route calculated successfully!")
-        distance = route['features'][0]['properties']['summary']['distance'] / 1000
-        duration = route['features'][0]['properties']['summary']['duration'] / 60
-        st.markdown(f"**Distance:** {distance:.1f} km")
-        st.markdown(f"**Estimated Duration:** {duration:.1f} minutes")
+        // Add route as line
+        map.addSource('route', {{
+            'type': 'geojson',
+            'data': {{
+                'type': 'Feature',
+                'geometry': {{
+                    'type': 'LineString',
+                    'coordinates': {route_coords_js}
+                }}
+            }}
+        }});
 
-        route_coords = route['features'][0]['geometry']['coordinates']
-
-    except Exception as e:
-        st.error("❌ Failed to calculate route.")
-        st.exception(e)
-
-# Load HTML and inject JS route block
-with open("public/gps.html", "r", encoding="utf-8") as f:
-    html_template = f.read()
-
-# Replace placeholder with real JS route variable
-if route_coords:
-    route_json = json.dumps(route_coords)
-    injected = f"<script>const routeData = {route_json};</script>"
-else:
-    injected = "<script>const routeData = null;</script>"
-
-html_final = html_template.replace("<!-- __ROUTE_DATA_PLACEHOLDER__ -->", injected)
-components.html(html_final, height=600, scrolling=False)
+        map.addLayer({{
+            'id': 'route-line',
+            'type': 'line',
+            'source': 'route',
+            'layout': {{
+                'line-join': 'round',
+                'line-cap': 'round'
+            }},
+            'paint': {{
+                'line-color': '#0074D9',
+                'line-width': 5
+            }}
+        }});
+    }});
+</script>
+</body>
+</html>
+""", height=650)
