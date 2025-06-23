@@ -30,7 +30,7 @@ components.html(f"""
 <body>
 <div id='map'></div>
 <script>
-    mapboxgl.accessToken = 'YOUR_MAPBOX_ACCESS_TOKEN';
+    mapboxgl.accessToken = 'pk.eyJ1IjoiZmxha29qb2RpIiwiYSI6ImNtYzlrNW5iZzE1YmoydW9ldnZmNTZpdnkifQ.GgxPKZLKgt0DJ5L9ggYP9A';
 
     const map = new mapboxgl.Map({{
         container: 'map',
