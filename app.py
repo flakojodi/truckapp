@@ -11,7 +11,6 @@ st.title("🚛 Truck-Safe GPS Navigation")
 
 MAPBOX_TOKEN = "pk.eyJ1IjoiZmxha29qb2RpIiwiYSI6ImNtYzlrNW5iZzE1YmoydW9ldnZmNTZpdnkifQ.GgxPKZLKgt0DJ5L9ggYP9A"
 
-# Session state for nav
 if "nav_started" not in st.session_state:
     st.session_state.nav_started = False
 
@@ -34,7 +33,7 @@ def geocode(address):
     res = requests.get(url, params=params)
     data = res.json()
     coords = data["features"][0]["center"]
-    return coords  # [lng, lat]
+    return coords
 
 # ======================
 # 📦 Generate Route
@@ -56,7 +55,6 @@ if st.button("🚚 Generate Route"):
         res = requests.get(directions_url, params=params)
         data = res.json()
 
-        # Save route
         route_geo = {
             "type": "FeatureCollection",
             "features": [{
@@ -69,7 +67,6 @@ if st.button("🚚 Generate Route"):
         steps = data["routes"][0]["legs"][0]["steps"]
         duration_sec = data["routes"][0]["duration"]
         distance_meters = data["routes"][0]["distance"]
-
         eta_time = datetime.utcnow() + timedelta(seconds=duration_sec)
 
         with open("route.json", "w") as f:
@@ -94,6 +91,7 @@ if os.path.exists("route.json") and os.path.exists("steps.json") and os.path.exi
     st.markdown("### 🧭 Navigation Controls")
     if st.button("▶️ Start Navigation"):
         st.session_state.nav_started = True
+        st.experimental_rerun()
 
     with open("info.json") as f:
         info = json.load(f)
@@ -214,7 +212,6 @@ if os.path.exists("route.json") and os.path.exists("steps.json"):
       userMarker.setLngLat([lng, lat]);
     }}
 
-    // voice navigation
     if (navStarted && stepIndex < steps.length) {{
       const step = steps[stepIndex];
       const [stepLng, stepLat] = step.location;
@@ -241,6 +238,5 @@ if os.path.exists("route.json") and os.path.exists("steps.json"):
 </body>
 </html>
 """, height=720)
-
 else:
     st.info("⚠️ No route yet. Enter start and destination above to begin.")
