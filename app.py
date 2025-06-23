@@ -4,11 +4,16 @@ import requests
 import os
 import urllib.parse
 import streamlit.components.v1 as components
+from datetime import datetime, timedelta
 
 st.set_page_config(layout="wide")
-st.title("🚛 Truck-Safe Live GPS Navigation")
+st.title("🚛 Truck-Safe GPS Navigation")
 
 MAPBOX_TOKEN = "pk.eyJ1IjoiZmxha29qb2RpIiwiYSI6ImNtYzlrNW5iZzE1YmoydW9ldnZmNTZpdnkifQ.GgxPKZLKgt0DJ5L9ggYP9A"
+
+# Session state for nav
+if "nav_started" not in st.session_state:
+    st.session_state.nav_started = False
 
 # ======================
 # 📍 Address Input
@@ -62,15 +67,41 @@ if st.button("🚚 Generate Route"):
         }
 
         steps = data["routes"][0]["legs"][0]["steps"]
+        duration_sec = data["routes"][0]["duration"]
+        distance_meters = data["routes"][0]["distance"]
+
+        eta_time = datetime.utcnow() + timedelta(seconds=duration_sec)
 
         with open("route.json", "w") as f:
             json.dump(route_geo, f)
         with open("steps.json", "w") as f:
             json.dump(steps, f)
+        with open("info.json", "w") as f:
+            json.dump({
+                "eta": eta_time.strftime("%I:%M %p"),
+                "distance_km": round(distance_meters / 1000, 1)
+            }, f)
 
-        st.success("✅ Route created! Scroll to see map and voice navigation.")
+        st.session_state.nav_started = False
+        st.success("✅ Route created! Scroll down to begin.")
     except Exception as e:
         st.error(f"❌ Error: {e}")
+
+# ======================
+# 🔘 Start Nav Button
+# ======================
+if os.path.exists("route.json") and os.path.exists("steps.json") and os.path.exists("info.json"):
+    st.markdown("### 🧭 Navigation Controls")
+    if st.button("▶️ Start Navigation"):
+        st.session_state.nav_started = True
+
+    with open("info.json") as f:
+        info = json.load(f)
+
+    st.markdown(f"""
+    **Estimated Arrival Time:** 🕒 {info['eta']}  
+    **Distance Remaining:** 📏 {info['distance_km']} km
+    """)
 
 # ======================
 # 🗺️ Display Map + Voice Nav
@@ -90,6 +121,8 @@ if os.path.exists("route.json") and os.path.exists("steps.json"):
         } for step in steps
     ])
 
+    nav_on = str(st.session_state.nav_started).lower()
+
     components.html(f"""
 <!DOCTYPE html>
 <html>
@@ -102,9 +135,11 @@ if os.path.exists("route.json") and os.path.exists("steps.json"):
   <style>
     body {{ margin: 0; padding: 0; }}
     #map {{ width: 100%; height: 600px; }}
+    #next-turn {{ padding: 10px; font-size: 18px; font-weight: bold; background: #111; color: #0f0; }}
   </style>
 </head>
 <body>
+<div id='next-turn'>Waiting to start navigation...</div>
 <div id='map'></div>
 <script>
   mapboxgl.accessToken = '{MAPBOX_TOKEN}';
@@ -117,6 +152,7 @@ if os.path.exists("route.json") and os.path.exists("steps.json"):
 
   const routeCoords = {route_coords_js};
   const steps = {steps_js};
+  const navStarted = {nav_on};
   let stepIndex = 0;
 
   map.on('load', () => {{
@@ -146,7 +182,6 @@ if os.path.exists("route.json") and os.path.exists("steps.json"):
     }});
   }});
 
-  // TTS voice
   function speak(text) {{
     const msg = new SpeechSynthesisUtterance(text);
     msg.rate = 1;
@@ -179,15 +214,22 @@ if os.path.exists("route.json") and os.path.exists("steps.json"):
       userMarker.setLngLat([lng, lat]);
     }}
 
-    // voice instructions
-    if (stepIndex < steps.length) {{
+    // voice navigation
+    if (navStarted && stepIndex < steps.length) {{
       const step = steps[stepIndex];
       const [stepLng, stepLat] = step.location;
       const dist = haversine(lat, lng, stepLat, stepLng);
 
+      document.getElementById("next-turn").innerText = step.instruction;
+
       if (dist < 35) {{
         speak(step.instruction);
         stepIndex += 1;
+
+        if (stepIndex >= steps.length) {{
+          speak("You have arrived.");
+          document.getElementById("next-turn").innerText = "✅ Arrived at destination!";
+        }}
       }}
     }}
   }}, err => console.error(err), {{
@@ -198,6 +240,7 @@ if os.path.exists("route.json") and os.path.exists("steps.json"):
 </script>
 </body>
 </html>
-""", height=650)
+""", height=720)
+
 else:
     st.info("⚠️ No route yet. Enter start and destination above to begin.")
