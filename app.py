@@ -1,60 +1,115 @@
 import streamlit as st
 import json
+import requests
 import os
 import streamlit.components.v1 as components
 
-st.title("Truck-Safe GPS Route Map")
+st.set_page_config(layout="wide")
+st.title("🚛 Truck-Safe GPS Navigation")
+MAPBOX_TOKEN = "pk.eyJ1IjoiZmxha29qb2RpIiwiYSI6ImNtYzlrNW5iZzE1YmoydW9ldnZmNTZpdnkifQ.GgxPKZLKgt0DJ5L9ggYP9A"
 
-# Only show map if route.json exists
+# ====== ROUTE GENERATION ======
+
+# Hardcoded start and end for now (Chicago to Oak Lawn)
+start = (-87.6298, 41.8781)
+end = (-87.7525, 41.7190)
+
+if st.button("🚚 Calculate Route"):
+    url = f"https://api.mapbox.com/directions/v5/mapbox/driving/{start[0]},{start[1]};{end[0]},{end[1]}"
+    params = {
+        "alternatives": "false",
+        "geometries": "geojson",
+        "steps": "true",
+        "overview": "full",
+        "access_token": MAPBOX_TOKEN
+    }
+
+    response = requests.get(url, params=params)
+
+    if response.status_code == 200:
+        data = response.json()
+        steps = data["routes"][0]["legs"][0]["steps"]
+
+        # Save the route
+        route_geo = {
+            "type": "FeatureCollection",
+            "features": [{
+                "type": "Feature",
+                "geometry": data["routes"][0]["geometry"],
+                "properties": {}
+            }]
+        }
+        with open("route.json", "w") as f:
+            json.dump(route_geo, f)
+
+        # Save the steps
+        with open("steps.json", "w") as f:
+            json.dump(steps, f)
+
+        st.success("✅ Route & directions saved!")
+        st.experimental_rerun()
+
+    else:
+        st.error(f"❌ Failed to get route: {response.text}")
+
+# ====== LOAD MAP + ROUTE ======
+
+route_coords_js = "[]"
+has_route = False
 if os.path.exists("route.json"):
     with open("route.json", "r") as f:
         route_data = json.load(f)
-
     route_coords = route_data["features"][0]["geometry"]["coordinates"]
     route_coords_js = json.dumps(route_coords)
+    has_route = True
 
-    components.html(f"""
-    <!DOCTYPE html>
-    <html>
-    <head>
-        <meta charset="utf-8" />
-        <title>Truck GPS Map</title>
-        <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <script src='https://api.mapbox.com/mapbox-gl-js/v2.15.0/mapbox-gl.js'></script>
-        <link href='https://api.mapbox.com/mapbox-gl-js/v2.15.0/mapbox-gl.css' rel='stylesheet' />
-        <style>
-            body {{ margin: 0; padding: 0; }}
-            #map {{ width: 100%; height: 600px; }}
-        </style>
-    </head>
-    <body>
-    <div id='map'></div>
-    <script>
-        mapboxgl.accessToken = 'pk.eyJ1IjoiZmxha29qb2RpIiwiYSI6ImNtYzlrNW5iZzE1YmoydW9ldnZmNTZpdnkifQ.GgxPKZLKgt0DJ5L9ggYP9A';
+components.html(f"""
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8" />
+    <title>Truck Map</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <script src='https://api.mapbox.com/mapbox-gl-js/v2.15.0/mapbox-gl.js'></script>
+    <link href='https://api.mapbox.com/mapbox-gl-js/v2.15.0/mapbox-gl.css' rel='stylesheet' />
+    <style>
+        body {{ margin: 0; padding: 0; }}
+        #map {{ width: 100%; height: 600px; }}
+    </style>
+</head>
+<body>
+<div id='map'></div>
+<script>
+    mapboxgl.accessToken = '{MAPBOX_TOKEN}';
 
-        const map = new mapboxgl.Map({{
-            container: 'map',
-            style: 'mapbox://styles/mapbox/streets-v11',
-            center: {route_coords_js}[0],
-            zoom: 12
-        }});
+    const map = new mapboxgl.Map({{
+        container: 'map',
+        style: 'mapbox://styles/mapbox/navigation-night-v1',
+        center: [-87.6298, 41.8781],
+        zoom: 12
+    }});
 
+    // Add GPS marker
+    navigator.geolocation.getCurrentPosition(pos => {{
+        const userLocation = [pos.coords.longitude, pos.coords.latitude];
+        new mapboxgl.Marker({{color: "red"}})
+            .setLngLat(userLocation)
+            .addTo(map);
+        map.setCenter(userLocation);
+    }});
+
+    // Draw route if it exists
+    const hasRoute = {str(has_route).lower()};
+    if (hasRoute) {{
+        const routeCoords = {route_coords_js};
         map.on('load', () => {{
-            // GPS marker
-            navigator.geolocation.getCurrentPosition(pos => {{
-                new mapboxgl.Marker({{color: "red"}})
-                    .setLngLat([pos.coords.longitude, pos.coords.latitude])
-                    .addTo(map);
-            }});
-
-            // Route Line
             map.addSource('route', {{
                 'type': 'geojson',
                 'data': {{
                     'type': 'Feature',
                     'geometry': {{
                         'type': 'LineString',
-                        'coordinates': {route_coords_js}
+                        'coordinates': routeCoords
                     }}
                 }}
             }});
@@ -73,10 +128,21 @@ if os.path.exists("route.json"):
                 }}
             }});
         }});
-    </script>
-    </body>
-    </html>
-    """, height=650)
+    }}
+</script>
+</body>
+</html>
+""", height=650)
 
+# ====== TURN-BY-TURN DIRECTIONS ======
+
+if os.path.exists("steps.json"):
+    st.subheader("📋 Turn-by-Turn Directions")
+    with open("steps.json", "r") as f:
+        steps = json.load(f)
+    for i, step in enumerate(steps):
+        instruction = step["maneuver"]["instruction"]
+        distance = step["distance"]
+        st.write(f"**{i+1}.** {instruction} ({round(distance)} meters)")
 else:
-    st.warning("⚠️ No route found. Please calculate a route first to display it on the map.")
+    st.info("📍 No directions yet. Click 'Calculate Route' to get 
