@@ -120,7 +120,7 @@ if os.path.exists("route.json") and os.path.exists("steps.json"):
         **Estimated Arrival Time:** 🕒 {info['eta']}  
         **Distance Remaining:** 📏 {info['distance_km']} km
         """)
-         ==========================
+# ==========================
 # 🗺️ Render Map + GPS Features
 # ==========================
 if os.path.exists("route.json") and os.path.exists("steps.json"):
