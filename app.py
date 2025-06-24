@@ -89,9 +89,10 @@ if st.button("🚚 Generate Route"):
 # ======================
 if os.path.exists("route.json") and os.path.exists("steps.json") and os.path.exists("info.json"):
     st.markdown("### 🧭 Navigation Controls")
-    if st.button("▶️ Start Navigation"):
+    nav_start_trigger = st.button("▶️ Start Navigation")
+
+    if nav_start_trigger:
         st.session_state.nav_started = True
-        st.success("✅ Navigation started! Please refresh the page manually.")
 
     with open("info.json") as f:
         info = json.load(f)
@@ -119,7 +120,8 @@ if os.path.exists("route.json") and os.path.exists("steps.json"):
         } for step in steps
     ])
 
-    nav_on = str(st.session_state.nav_started).lower()
+    # ✅ Pass nav status as JS-readable flag
+    nav_on = "true" if st.session_state.nav_started else "false"
 
     components.html(f"""
 <!DOCTYPE html>
@@ -238,5 +240,3 @@ if os.path.exists("route.json") and os.path.exists("steps.json"):
 </body>
 </html>
 """, height=720)
-else:
-    st.info("⚠️ No route yet. Enter start and destination above to begin.")
