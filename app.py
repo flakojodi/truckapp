@@ -13,10 +13,25 @@ MAPBOX_TOKEN = "pk.eyJ1IjoiZmxha29qb2RpIiwiYSI6ImNtYzlrNW5iZzE1YmoydW9ldnZmNTZpd
 
 if "nav_started" not in st.session_state:
     st.session_state.nav_started = False
+if "start_address" not in st.session_state:
+    st.session_state.start_address = ""
+if "end_address" not in st.session_state:
+    st.session_state.end_address = ""
 
-# ==========================
-# 📍 Input Fields with Autocomplete
-# ==========================
+# JavaScript listener bridge for address selection
+st.components.v1.html(f"""
+<script>
+window.addEventListener("message", (event) => {{
+    if (event.data.type === "start_selected") {{
+        window.parent.postMessage({{type: "streamlit:setComponentValue", value: {{ start: event.data.value }} }}, "*");
+    }}
+    if (event.data.type === "end_selected") {{
+        window.parent.postMessage({{type: "streamlit:setComponentValue", value: {{ end: event.data.value }} }}, "*");
+    }}
+}});
+</script>
+""", height=0)
+
 st.subheader("Enter Route and Truck Info")
 col1, col2 = st.columns(2)
 with col1:
@@ -98,59 +113,56 @@ def is_route_safe(steps, max_height_ft):
     return True
 
 # ==========================
-# 📦 Generate Route
+# 📦 Generate Route Automatically
 # ==========================
-if True:
+start = st.session_state.start_address
+end = st.session_state.end_address
+
+if start and end:
     try:
-        start_address = st.query_params.get("start", [""])[0]
-        end_address = st.query_params.get("end", [""])[0]
+        start_coords = geocode(start)
+        end_coords = geocode(end)
 
-        if not start_address or not end_address:
-            st.warning("Please enter both a start and destination address.")
+        directions_url = f"https://api.mapbox.com/directions/v5/mapbox/driving/{start_coords[0]},{start_coords[1]};{end_coords[0]},{end_coords[1]}"
+        params = {
+            "alternatives": "false",
+            "geometries": "geojson",
+            "steps": "true",
+            "overview": "full",
+            "access_token": MAPBOX_TOKEN
+        }
+
+        res = requests.get(directions_url, params=params)
+        data = res.json()
+        steps = data["routes"][0]["legs"][0]["steps"]
+
+        if not is_route_safe(steps, truck_height):
+            st.error("🚫 Route includes a low-clearance bridge for your truck height!")
         else:
-            start_coords = geocode(start_address)
-            end_coords = geocode(end_address)
-
-            directions_url = f"https://api.mapbox.com/directions/v5/mapbox/driving/{start_coords[0]},{start_coords[1]};{end_coords[0]},{end_coords[1]}"
-            params = {
-                "alternatives": "false",
-                "geometries": "geojson",
-                "steps": "true",
-                "overview": "full",
-                "access_token": MAPBOX_TOKEN
+            route_geo = {
+                "type": "FeatureCollection",
+                "features": [{
+                    "type": "Feature",
+                    "geometry": data["routes"][0]["geometry"],
+                    "properties": {}
+                }]
             }
 
-            res = requests.get(directions_url, params=params)
-            data = res.json()
-            steps = data["routes"][0]["legs"][0]["steps"]
+            duration_sec = data["routes"][0]["duration"]
+            distance_meters = data["routes"][0]["distance"]
+            eta_time = datetime.utcnow() + timedelta(seconds=duration_sec)
 
-            if not is_route_safe(steps, truck_height):
-                st.error("🚫 Route includes a low-clearance bridge for your truck height!")
-            else:
-                route_geo = {
-                    "type": "FeatureCollection",
-                    "features": [{
-                        "type": "Feature",
-                        "geometry": data["routes"][0]["geometry"],
-                        "properties": {}
-                    }]
-                }
+            with open("route.json", "w") as f:
+                json.dump(route_geo, f)
+            with open("steps.json", "w") as f:
+                json.dump(steps, f)
+            with open("info.json", "w") as f:
+                json.dump({
+                    "eta": eta_time.strftime("%I:%M %p"),
+                    "distance_km": round(distance_meters / 1000, 1)
+                }, f)
 
-                duration_sec = data["routes"][0]["duration"]
-                distance_meters = data["routes"][0]["distance"]
-                eta_time = datetime.utcnow() + timedelta(seconds=duration_sec)
-
-                with open("route.json", "w") as f:
-                    json.dump(route_geo, f)
-                with open("steps.json", "w") as f:
-                    json.dump(steps, f)
-                with open("info.json", "w") as f:
-                    json.dump({
-                        "eta": eta_time.strftime("%I:%M %p"),
-                        "distance_km": round(distance_meters / 1000, 1)
-                    }, f)
-
-                st.session_state.nav_started = False
-                st.success("✅ Route created! Scroll down to begin.")
+            st.session_state.nav_started = False
+            st.success("✅ Route created! Scroll down to begin.")
     except Exception as e:
         st.error(f"❌ Error: {e}")
