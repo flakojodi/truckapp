@@ -7,7 +7,7 @@ import streamlit.components.v1 as components
 from datetime import datetime, timedelta
 
 st.set_page_config(layout="wide")
-st.title("🚛 Truck-Safe GPS Navigation")
+st.title("🚛 Truck-Safe GPS Navigation (Google Maps Style Autocomplete)")
 
 MAPBOX_TOKEN = "pk.eyJ1IjoiZmxha29qb2RpIiwiYSI6ImNtYzlrNW5iZzE1YmoydW9ldnZmNTZpdnkifQ.GgxPKZLKgt0DJ5L9ggYP9A"
 
@@ -15,15 +15,59 @@ if "nav_started" not in st.session_state:
     st.session_state.nav_started = False
 
 # ==========================
-# 📍 Input Fields
+# 📍 Input Fields with Autocomplete
 # ==========================
 st.subheader("Enter Route and Truck Info")
 col1, col2 = st.columns(2)
 with col1:
-    start_address = st.text_input("Start Location", "Chicago, IL")
+    st.markdown("**Start Location**")
+    components.html(f"""
+    <input id='startInput' placeholder='Enter start location...' style='width:100%;padding:10px;font-size:16px;'>
+    <div id='startResults' style='border:1px solid #ccc;max-height:150px;overflow-y:auto;background:white;position:relative;z-index:1000;'></div>
+    <script>
+    const startInput = document.getElementById('startInput');
+    const startResults = document.getElementById('startResults');
+
+    startInput.addEventListener('input', async () => {{
+        const val = startInput.value;
+        if (val.length < 3) return startResults.innerHTML = "";
+        const res = await fetch(`https://api.mapbox.com/geocoding/v5/mapbox.places/${{encodeURIComponent(val)}}.json?access_token={MAPBOX_TOKEN}`);
+        const data = await res.json();
+        startResults.innerHTML = data.features.map(f => `<div onclick='selectStart("${{f.place_name.replace(/"/g, "&quot;")}}")' style='padding:8px;border-bottom:1px solid #eee;cursor:pointer;'>📍 ${{f.place_name}}</div>`).join('');
+    }});
+
+    function selectStart(place) {{
+        startInput.value = place;
+        startResults.innerHTML = "";
+        window.parent.postMessage({{type: 'start_selected', value: place}}, '*');
+    }}
+    </script>
+    """, height=200)
     truck_height = float(st.text_input("Truck Height (in feet)", "13.5"))
 with col2:
-    end_address = st.text_input("Destination", "Oak Lawn, IL")
+    st.markdown("**Destination**")
+    components.html(f"""
+    <input id='endInput' placeholder='Enter destination...' style='width:100%;padding:10px;font-size:16px;'>
+    <div id='endResults' style='border:1px solid #ccc;max-height:150px;overflow-y:auto;background:white;position:relative;z-index:1000;'></div>
+    <script>
+    const endInput = document.getElementById('endInput');
+    const endResults = document.getElementById('endResults');
+
+    endInput.addEventListener('input', async () => {{
+        const val = endInput.value;
+        if (val.length < 3) return endResults.innerHTML = "";
+        const res = await fetch(`https://api.mapbox.com/geocoding/v5/mapbox.places/${{encodeURIComponent(val)}}.json?access_token={MAPBOX_TOKEN}`);
+        const data = await res.json();
+        endResults.innerHTML = data.features.map(f => `<div onclick='selectEnd("${{f.place_name.replace(/"/g, "&quot;")}}")' style='padding:8px;border-bottom:1px solid #eee;cursor:pointer;'>📍 ${{f.place_name}}</div>`).join('');
+    }});
+
+    function selectEnd(place) {{
+        endInput.value = place;
+        endResults.innerHTML = "";
+        window.parent.postMessage({{type: 'end_selected', value: place}}, '*');
+    }}
+    </script>
+    """, height=200)
     truck_weight = st.text_input("Truck Weight (in tons)", "20")
 
 # ==========================
@@ -52,238 +96,61 @@ def is_route_safe(steps, max_height_ft):
             if dist < 0.005 and bridge["clearance_ft"] < max_height_ft:
                 return False
     return True
+
 # ==========================
 # 📦 Generate Route
 # ==========================
 if st.button("🚚 Generate Route"):
     try:
-        start_coords = geocode(start_address)
-        end_coords = geocode(end_address)
+        start_address = st.experimental_get_query_params().get("start", [""])[0]
+        end_address = st.experimental_get_query_params().get("end", [""])[0]
 
-        directions_url = f"https://api.mapbox.com/directions/v5/mapbox/driving/{start_coords[0]},{start_coords[1]};{end_coords[0]},{end_coords[1]}"
-        params = {
-            "alternatives": "false",
-            "geometries": "geojson",
-            "steps": "true",
-            "overview": "full",
-            "access_token": MAPBOX_TOKEN
-        }
-
-        res = requests.get(directions_url, params=params)
-        data = res.json()
-        steps = data["routes"][0]["legs"][0]["steps"]
-
-        # Check for low bridge conflict
-        if not is_route_safe(steps, truck_height):
-            st.error("🚫 Route includes a low-clearance bridge for your truck height!")
+        if not start_address or not end_address:
+            st.warning("Please enter both a start and destination address.")
         else:
-            route_geo = {
-                "type": "FeatureCollection",
-                "features": [{
-                    "type": "Feature",
-                    "geometry": data["routes"][0]["geometry"],
-                    "properties": {}
-                }]
+            start_coords = geocode(start_address)
+            end_coords = geocode(end_address)
+
+            directions_url = f"https://api.mapbox.com/directions/v5/mapbox/driving/{start_coords[0]},{start_coords[1]};{end_coords[0]},{end_coords[1]}"
+            params = {
+                "alternatives": "false",
+                "geometries": "geojson",
+                "steps": "true",
+                "overview": "full",
+                "access_token": MAPBOX_TOKEN
             }
 
-            duration_sec = data["routes"][0]["duration"]
-            distance_meters = data["routes"][0]["distance"]
-            eta_time = datetime.utcnow() + timedelta(seconds=duration_sec)
+            res = requests.get(directions_url, params=params)
+            data = res.json()
+            steps = data["routes"][0]["legs"][0]["steps"]
 
-            with open("route.json", "w") as f:
-                json.dump(route_geo, f)
-            with open("steps.json", "w") as f:
-                json.dump(steps, f)
-            with open("info.json", "w") as f:
-                json.dump({
-                    "eta": eta_time.strftime("%I:%M %p"),
-                    "distance_km": round(distance_meters / 1000, 1)
-                }, f)
+            if not is_route_safe(steps, truck_height):
+                st.error("🚫 Route includes a low-clearance bridge for your truck height!")
+            else:
+                route_geo = {
+                    "type": "FeatureCollection",
+                    "features": [{
+                        "type": "Feature",
+                        "geometry": data["routes"][0]["geometry"],
+                        "properties": {}
+                    }]
+                }
 
-            st.session_state.nav_started = False
-            st.success("✅ Route created! Scroll down to begin.")
+                duration_sec = data["routes"][0]["duration"]
+                distance_meters = data["routes"][0]["distance"]
+                eta_time = datetime.utcnow() + timedelta(seconds=duration_sec)
+
+                with open("route.json", "w") as f:
+                    json.dump(route_geo, f)
+                with open("steps.json", "w") as f:
+                    json.dump(steps, f)
+                with open("info.json", "w") as f:
+                    json.dump({
+                        "eta": eta_time.strftime("%I:%M %p"),
+                        "distance_km": round(distance_meters / 1000, 1)
+                    }, f)
+
+                st.session_state.nav_started = False
+                st.success("✅ Route created! Scroll down to begin.")
     except Exception as e:
         st.error(f"❌ Error: {e}")
-
-# ==========================
-# 🔘 Start Navigation + ETA
-# ==========================
-if os.path.exists("route.json") and os.path.exists("steps.json"):
-    st.markdown("### 🧭 Navigation Controls")
-    if st.button("▶️ Start Navigation"):
-        st.session_state.nav_started = True
-
-    if os.path.exists("info.json"):
-        with open("info.json") as f:
-            info = json.load(f)
-        st.markdown(f"""
-        **Estimated Arrival Time:** 🕒 {info['eta']}  
-        **Distance Remaining:** 📏 {info['distance_km']} km
-        """)
-# ==========================
-# 🗺️ Render Map + GPS Features
-# ==========================
-if os.path.exists("route.json") and os.path.exists("steps.json"):
-    with open("route.json") as f:
-        route_data = json.load(f)
-    with open("steps.json") as f:
-        steps = json.load(f)
-
-    route_coords_js = json.dumps(route_data["features"][0]["geometry"]["coordinates"])
-    steps_js = json.dumps([
-        {"instruction": s["maneuver"]["instruction"], "location": s["maneuver"]["location"]}
-        for s in steps
-    ])
-    nav_on = "true" if st.session_state.nav_started else "false"
-
-    components.html(f"""
-<!DOCTYPE html>
-<html>
-<head>
-  <meta charset="utf-8">
-  <title>Truck GPS</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <script src="https://api.mapbox.com/mapbox-gl-js/v2.15.0/mapbox-gl.js"></script>
-  <link href="https://api.mapbox.com/mapbox-gl-js/v2.15.0/mapbox-gl.css" rel="stylesheet">
-  <style>
-    body {{ margin: 0; }}
-    #map {{ height: 600px; }}
-    #next-turn, #street-name {{
-      padding: 10px; font-size: 16px; font-weight: bold;
-      background: #111; color: #0f0;
-    }}
-  </style>
-</head>
-<body>
-<div id="next-turn">Waiting for GPS...</div>
-<div id="street-name">📍 Street: ...</div>
-<div id="map"></div>
-<script>
-mapboxgl.accessToken = '{MAPBOX_TOKEN}';
-const routeCoords = {route_coords_js};
-const steps = {steps_js};
-const navStarted = {nav_on};
-let stepIndex = 0;
-let rerouteTriggered = false;
-let currentDest = steps.length > 0 ? steps[steps.length - 1].location : null;
-
-const map = new mapboxgl.Map({{
-  container: 'map',
-  style: 'mapbox://styles/mapbox/navigation-night-v1',
-  center: routeCoords[0],
-  zoom: 14,
-  pitch: 45,
-  bearing: 0
-}});
-
-map.on('load', () => {{
-  map.addSource('route', {{
-    type: 'geojson',
-    data: {{
-      type: 'Feature',
-      geometry: {{
-        type: 'LineString',
-        coordinates: routeCoords
-      }}
-    }}
-  }});
-  map.addLayer({{
-    id: 'route-line',
-    type: 'line',
-    source: 'route',
-    layout: {{
-      'line-join': 'round',
-      'line-cap': 'round'
-    }},
-    paint: {{
-      'line-color': '#00FF99',
-      'line-width': 5
-    }}
-  }});
-}});
-
-function speak(text) {{
-  const msg = new SpeechSynthesisUtterance(text);
-  msg.rate = 1;
-  window.speechSynthesis.speak(msg);
-}}
-
-let marker = null;
-
-function haversine(lat1, lon1, lat2, lon2) {{
-  const R = 6371e3;
-  const toRad = x => x * Math.PI / 180;
-  const dLat = toRad(lat2 - lat1);
-  const dLon = toRad(lon2 - lon1);
-  const a = Math.sin(dLat/2)**2 + Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLon/2)**2;
-  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-  return R * c;
-}}
-
-function reverseGeocode(lat, lng) {{
-  fetch(`https://api.mapbox.com/geocoding/v5/mapbox.places/${{lng}},${{lat}}.json?access_token={MAPBOX_TOKEN}`)
-    .then(res => res.json())
-    .then(data => {{
-      if (data.features.length > 0) {{
-        const name = data.features[0].place_name;
-        document.getElementById("street-name").innerText = "📍 " + name;
-      }}
-    }});
-}}
-
-navigator.geolocation.watchPosition(pos => {{
-  const lat = pos.coords.latitude;
-  const lng = pos.coords.longitude;
-  const heading = pos.coords.heading || 0;
-
-  map.easeTo({{
-    center: [lng, lat],
-    bearing: heading
-  }});
-
-  reverseGeocode(lat, lng);
-
-  if (!marker) {{
-    marker = new mapboxgl.Marker({{ color: 'red' }})
-      .setLngLat([lng, lat])
-      .addTo(map);
-  }} else {{
-    marker.setLngLat([lng, lat]);
-  }}
-
-  if (navStarted && stepIndex < steps.length) {{
-    const step = steps[stepIndex];
-    const [stepLng, stepLat] = step.location;
-    const dist = haversine(lat, lng, stepLat, stepLng);
-
-    document.getElementById("next-turn").innerText = step.instruction;
-
-    if (dist < 35) {{
-      speak(step.instruction);
-      stepIndex += 1;
-      if (stepIndex >= steps.length) {{
-        speak("You have arrived.");
-        document.getElementById("next-turn").innerText = "✅ Arrived at destination!";
-      }}
-    }}
-  }}
-
-  // 🛑 Auto-Reroute if off path
-  if (navStarted && stepIndex < steps.length && !rerouteTriggered) {{
-    const [targetLng, targetLat] = steps[stepIndex].location;
-    const offTrack = haversine(lat, lng, targetLat, targetLng) > 200;
-    if (offTrack) {{
-      rerouteTriggered = true;
-      speak("Recalculating route...");
-      window.location.reload(); // Simple reset for now
-    }}
-  }}
-}}, err => console.error(err), {{
-  enableHighAccuracy: true,
-  timeout: 5000,
-  maximumAge: 0
-}});
-</script>
-</body>
-</html>
-""", height=700)
