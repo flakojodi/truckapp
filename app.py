@@ -7,7 +7,7 @@ import streamlit.components.v1 as components
 from datetime import datetime, timedelta
 
 st.set_page_config(layout="wide")
-st.title("🚛 Truck-Safe GPS Navigation (Google Maps Style Autocomplete)")
+st.title("🚛 Truck-Safe GPS Navigation")
 
 MAPBOX_TOKEN = "pk.eyJ1IjoiZmxha29qb2RpIiwiYSI6ImNtYzlrNW5iZzE1YmoydW9ldnZmNTZpdnkifQ.GgxPKZLKgt0DJ5L9ggYP9A"
 
@@ -100,10 +100,10 @@ def is_route_safe(steps, max_height_ft):
 # ==========================
 # 📦 Generate Route
 # ==========================
-if st.button("🚚 Generate Route"):
+if True:
     try:
         start_address = st.query_params.get("start", [""])[0]
-        end_address = st.experimental_get_query_params().get("end", [""])[0]
+        end_address = st.query_params.get("end", [""])[0]
 
         if not start_address or not end_address:
             st.warning("Please enter both a start and destination address.")
