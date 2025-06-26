@@ -102,7 +102,7 @@ def is_route_safe(steps, max_height_ft):
 # ==========================
 if st.button("🚚 Generate Route"):
     try:
-        start_address = st.experimental_get_query_params().get("start", [""])[0]
+        start_address = st.query_params.get("start", [""])[0]
         end_address = st.experimental_get_query_params().get("end", [""])[0]
 
         if not start_address or not end_address:
