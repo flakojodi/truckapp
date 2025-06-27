@@ -18,19 +18,15 @@ if "start_address" not in st.session_state:
 if "end_address" not in st.session_state:
     st.session_state.end_address = ""
 
-# JavaScript listener bridge for address selection
-st.components.v1.html(f"""
-<script>
-window.addEventListener("message", (event) => {{
-    if (event.data.type === "start_selected") {{
-        window.parent.postMessage({{type: "streamlit:setComponentValue", value: {{ start: event.data.value }} }}, "*");
-    }}
-    if (event.data.type === "end_selected") {{
-        window.parent.postMessage({{type: "streamlit:setComponentValue", value: {{ end: event.data.value }} }}, "*");
-    }}
-}});
-</script>
-""", height=0)
+# Hidden inputs to hold selected address values
+start_address_input = st.empty()
+end_address_input = st.empty()
+
+# Set streamlit state from hidden inputs
+if start_address_input.text_input("", key="start_hidden"):
+    st.session_state.start_address = st.session_state.start_hidden
+if end_address_input.text_input("", key="end_hidden"):
+    st.session_state.end_address = st.session_state.end_hidden
 
 st.subheader("Enter Route and Truck Info")
 col1, col2 = st.columns(2)
@@ -54,11 +50,13 @@ with col1:
     function selectStart(place) {{
         startInput.value = place;
         startResults.innerHTML = "";
-        window.parent.postMessage({{type: 'start_selected', value: place}}, '*');
+        const hiddenInput = window.parent.document.querySelector('[data-testid="stTextInput"] input[name="start_hidden"]');
+        if (hiddenInput) {{ hiddenInput.value = place; hiddenInput.dispatchEvent(new Event('input', {{ bubbles: true }})); }}
     }}
     </script>
     """, height=200)
     truck_height = float(st.text_input("Truck Height (in feet)", "13.5"))
+
 with col2:
     st.markdown("**Destination**")
     components.html(f"""
@@ -79,7 +77,8 @@ with col2:
     function selectEnd(place) {{
         endInput.value = place;
         endResults.innerHTML = "";
-        window.parent.postMessage({{type: 'end_selected', value: place}}, '*');
+        const hiddenInput = window.parent.document.querySelector('[data-testid="stTextInput"] input[name="end_hidden"]');
+        if (hiddenInput) {{ hiddenInput.value = place; hiddenInput.dispatchEvent(new Event('input', {{ bubbles: true }})); }}
     }}
     </script>
     """, height=200)
