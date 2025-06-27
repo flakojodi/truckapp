@@ -113,19 +113,12 @@ if start and end:
     st.write("📍 Start Address:", start)
 st.write("🏁 End Address:", end)
 try:
-        start_coords = geocode(start)
-        end_coords = geocode(end)
-
-        directions_url = f"https://api.mapbox.com/directions/v5/mapbox/driving/{start_coords[0]},{start_coords[1]};{end_coords[0]},{end_coords[1]}"
-        params = {
-            "alternatives": "false",
-            "geometries": "geojson",
-            "steps": "true",
-            "overview": "full",
-            "access_token": MAPBOX_TOKEN
-        }
+        st.write("📍 Start Address:", start)
+        st.write("🏁 End Address:", end)
 
         res = requests.get(directions_url, params=params)
+        st.write("🛰️ Mapbox Directions API Response:", res.status_code)
+        st.write(res.json())
 st.write("🛰️ Mapbox Directions API Response:", res.status_code)
 st.write(res.json())
         data = res.json()
@@ -192,4 +185,4 @@ st.write(res.json())
             """, height=620)
 
     except Exception as e:
-        st.error(f"❌ Error: {e}")
+        st.exception(e)
