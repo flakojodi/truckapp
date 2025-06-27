@@ -28,7 +28,7 @@ with col1:
             f"https://api.mapbox.com/geocoding/v5/mapbox.places/{urllib.parse.quote(start_query)}.json",
             params={"access_token": MAPBOX_TOKEN})
         for feature in res.json().get("features", [])[:5]:
-            if st.button(f"📍 {feature['place_name']}", key=feature['id']):
+            if st.button(f"📍 {feature['place_name']}", key="start_" + feature['id']):
                 st.session_state.start_address = feature['place_name']
                 start_query = feature['place_name']
     truck_height = float(st.text_input("Truck Height (feet)", "13.5"))
@@ -42,7 +42,7 @@ with col2:
             f"https://api.mapbox.com/geocoding/v5/mapbox.places/{urllib.parse.quote(end_query)}.json",
             params={"access_token": MAPBOX_TOKEN})
         for feature in res.json().get("features", [])[:5]:
-            if st.button(f"📍 {feature['place_name']}", key=feature['id']):
+            if st.button(f"📍 {feature['place_name']}", key="end_" + feature['id']):
                 st.session_state.end_address = feature['place_name']
                 end_query = feature['place_name']
     truck_weight = st.text_input("Truck Weight (tons)", "20")
