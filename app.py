@@ -110,7 +110,9 @@ start = st.session_state.start_address
 end = st.session_state.end_address
 
 if start and end:
-    try:
+    st.write("📍 Start Address:", start)
+st.write("🏁 End Address:", end)
+try:
         start_coords = geocode(start)
         end_coords = geocode(end)
 
@@ -124,6 +126,8 @@ if start and end:
         }
 
         res = requests.get(directions_url, params=params)
+st.write("🛰️ Mapbox Directions API Response:", res.status_code)
+st.write(res.json())
         data = res.json()
         steps = data["routes"][0]["legs"][0]["steps"]
 
