@@ -14,6 +14,8 @@ if "start_address" not in st.session_state:
     st.session_state.start_address = ""
 if "end_address" not in st.session_state:
     st.session_state.end_address = ""
+if "rerun" not in st.session_state:
+    st.session_state.rerun = False
 
 st.subheader("Enter Route and Truck Info")
 col1, col2 = st.columns(2)
@@ -30,7 +32,7 @@ with col1:
         for feature in res.json().get("features", [])[:5]:
             if st.button(f"📍 {feature['place_name']}", key="start_" + feature['id']):
                 st.session_state.start_address = feature['place_name']
-                st.experimental_rerun()
+                st.session_state.rerun = True
 
     truck_height = float(st.text_input("Truck Height (feet)", "13.5"))
 
@@ -46,7 +48,7 @@ with col2:
         for feature in res.json().get("features", [])[:5]:
             if st.button(f"📍 {feature['place_name']}", key="end_" + feature['id']):
                 st.session_state.end_address = feature['place_name']
-                st.experimental_rerun()
+                st.session_state.rerun = True
 
     truck_weight = st.text_input("Truck Weight (tons)", "20")
 
