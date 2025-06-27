@@ -119,6 +119,8 @@ try:
         res = requests.get(directions_url, params=params)
         st.write("🛰️ Mapbox Directions API Response:", res.status_code)
         st.write(res.json())
+        st.write("🛰️ Mapbox Directions API Response:", res.status_code)
+        st.write(res.json())
 st.write("🛰️ Mapbox Directions API Response:", res.status_code)
 st.write(res.json())
         data = res.json()
@@ -185,4 +187,4 @@ st.write(res.json())
             """, height=620)
 
     except Exception as e:
-        st.exception(e)
+        st.error(f"❌ Exception occurred: {e}")
