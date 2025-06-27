@@ -110,19 +110,26 @@ start = st.session_state.start_address
 end = st.session_state.end_address
 
 if start and end:
-    st.write("📍 Start Address:", start)
-st.write("🏁 End Address:", end)
-try:
+    try:
         st.write("📍 Start Address:", start)
         st.write("🏁 End Address:", end)
+
+        start_coords = geocode(start)
+        end_coords = geocode(end)
+
+        directions_url = f"https://api.mapbox.com/directions/v5/mapbox/driving/{start_coords[0]},{start_coords[1]};{end_coords[0]},{end_coords[1]}"
+        params = {
+            "alternatives": "false",
+            "geometries": "geojson",
+            "steps": "true",
+            "overview": "full",
+            "access_token": MAPBOX_TOKEN
+        }
 
         res = requests.get(directions_url, params=params)
         st.write("🛰️ Mapbox Directions API Response:", res.status_code)
         st.write(res.json())
-        st.write("🛰️ Mapbox Directions API Response:", res.status_code)
-        st.write(res.json())
-st.write("🛰️ Mapbox Directions API Response:", res.status_code)
-st.write(res.json())
+
         data = res.json()
         steps = data["routes"][0]["legs"][0]["steps"]
 
@@ -154,6 +161,40 @@ st.write(res.json())
 
             st.session_state.nav_started = False
             st.success("✅ Route created! Scroll down to begin.")
+
+            # 🗺️ Render Map
+            components.html(f"""
+            <div id='map' style='height: 600px;'></div>
+            <script src='https://api.mapbox.com/mapbox-gl-js/v2.15.0/mapbox-gl.js'></script>
+            <link href='https://api.mapbox.com/mapbox-gl-js/v2.15.0/mapbox-gl.css' rel='stylesheet' />
+            <script>
+            mapboxgl.accessToken = '{MAPBOX_TOKEN}';
+            const map = new mapboxgl.Map({{
+                container: 'map',
+                style: 'mapbox://styles/mapbox/streets-v11',
+                center: [{start_coords[0]}, {start_coords[1]}],
+                zoom: 13
+            }});
+            map.on('load', () => {{
+                map.addSource('route', {{
+                    type: 'geojson',
+                    data: {json.dumps(route_geo)}
+                }});
+                map.addLayer({{
+                    id: 'route-line',
+                    type: 'line',
+                    source: 'route',
+                    layout: {{ 'line-join': 'round', 'line-cap': 'round' }},
+                    paint: {{ 'line-color': '#00FF99', 'line-width': 5 }}
+                }});
+                new mapboxgl.Marker().setLngLat([{start_coords[0]}, {start_coords[1]}]).addTo(map);
+                new mapboxgl.Marker({{ color: 'red' }}).setLngLat([{end_coords[0]}, {end_coords[1]}]).addTo(map);
+            }});
+            </script>
+            """, height=620)
+
+    except Exception as e:
+        st.error(f"❌ Exception occurred: {e}")
 
             # 🗺️ Render Map
             components.html(f"""
