@@ -18,16 +18,6 @@ if "start_address" not in st.session_state:
 if "end_address" not in st.session_state:
     st.session_state.end_address = ""
 
-# Hidden inputs to hold selected address values
-start_address_input = st.empty()
-end_address_input = st.empty()
-
-# Set streamlit state from hidden inputs
-if start_address_input.text_input("", key="start_hidden"):
-    st.session_state.start_address = st.session_state.start_hidden
-if end_address_input.text_input("", key="end_hidden"):
-    st.session_state.end_address = st.session_state.end_hidden
-
 st.subheader("Enter Route and Truck Info")
 col1, col2 = st.columns(2)
 with col1:
@@ -50,11 +40,12 @@ with col1:
     function selectStart(place) {{
         startInput.value = place;
         startResults.innerHTML = "";
-        const hiddenInput = window.parent.document.querySelector('[data-testid="stTextInput"] input[name="start_hidden"]');
+        const hiddenInput = window.parent.document.querySelector('[name="start_hidden"]');
         if (hiddenInput) {{ hiddenInput.value = place; hiddenInput.dispatchEvent(new Event('input', {{ bubbles: true }})); }}
     }}
     </script>
-    """, height=200)
+    <input type='hidden' name='start_hidden'>
+    """, height=250)
     truck_height = float(st.text_input("Truck Height (in feet)", "13.5"))
 
 with col2:
@@ -77,11 +68,12 @@ with col2:
     function selectEnd(place) {{
         endInput.value = place;
         endResults.innerHTML = "";
-        const hiddenInput = window.parent.document.querySelector('[data-testid="stTextInput"] input[name="end_hidden"]');
+        const hiddenInput = window.parent.document.querySelector('[name="end_hidden"]');
         if (hiddenInput) {{ hiddenInput.value = place; hiddenInput.dispatchEvent(new Event('input', {{ bubbles: true }})); }}
     }}
     </script>
-    """, height=200)
+    <input type='hidden' name='end_hidden'>
+    """, height=250)
     truck_weight = st.text_input("Truck Weight (in tons)", "20")
 
 # ==========================
@@ -163,5 +155,37 @@ if start and end:
 
             st.session_state.nav_started = False
             st.success("✅ Route created! Scroll down to begin.")
+
+            # 🗺️ Render Map
+            components.html(f"""
+            <div id='map' style='height: 600px;'></div>
+            <script src='https://api.mapbox.com/mapbox-gl-js/v2.15.0/mapbox-gl.js'></script>
+            <link href='https://api.mapbox.com/mapbox-gl-js/v2.15.0/mapbox-gl.css' rel='stylesheet' />
+            <script>
+            mapboxgl.accessToken = '{MAPBOX_TOKEN}';
+            const map = new mapboxgl.Map({{
+                container: 'map',
+                style: 'mapbox://styles/mapbox/streets-v11',
+                center: [{start_coords[0]}, {start_coords[1]}],
+                zoom: 13
+            }});
+            map.on('load', () => {{
+                map.addSource('route', {{
+                    type: 'geojson',
+                    data: {json.dumps(route_geo)}
+                }});
+                map.addLayer({{
+                    id: 'route-line',
+                    type: 'line',
+                    source: 'route',
+                    layout: {{ 'line-join': 'round', 'line-cap': 'round' }},
+                    paint: {{ 'line-color': '#00FF99', 'line-width': 5 }}
+                }});
+                new mapboxgl.Marker().setLngLat([{start_coords[0]}, {start_coords[1]}]).addTo(map);
+                new mapboxgl.Marker({{ color: 'red' }}).setLngLat([{end_coords[0]}, {end_coords[1]}]).addTo(map);
+            }});
+            </script>
+            """, height=620)
+
     except Exception as e:
         st.error(f"❌ Error: {e}")
