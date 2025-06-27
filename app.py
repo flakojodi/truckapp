@@ -40,7 +40,7 @@ with col1:
         </script>
         <input type="hidden" name="gps_coords">
         """, height=0)
-        gps_input = st.text_input("", key="gps_coords", label_visibility="collapsed")
+        gps_input = st.text_input(" ", key="gps_coords", label_visibility="collapsed")
         if gps_input:
             lat, lon = map(float, gps_input.split(","))
             geocode_url = f"https://api.mapbox.com/geocoding/v5/mapbox.places/{lon},{lat}.json?access_token={MAPBOX_TOKEN}"
