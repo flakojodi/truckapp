@@ -17,18 +17,57 @@ if "start_address" not in st.session_state:
     st.session_state.start_address = ""
 if "end_address" not in st.session_state:
     st.session_state.end_address = ""
+if "current_coords" not in st.session_state:
+    st.session_state.current_coords = None
 
 st.subheader("Enter Route and Truck Info")
 col1, col2 = st.columns(2)
+
 with col1:
     st.markdown("**Start Location**")
-    start = st.text_input("", key="start", label_visibility="collapsed")
-    st.session_state.start_address = start
+    use_gps = st.checkbox("📡 Use My Current Location")
+    if use_gps:
+        components.html("""
+        <script>
+        navigator.geolocation.getCurrentPosition(function(position) {
+            const coords = position.coords.latitude + "," + position.coords.longitude;
+            const input = window.parent.document.querySelector('[name="gps_coords"]');
+            if (input) {
+                input.value = coords;
+                input.dispatchEvent(new Event('input', { bubbles: true }));
+            }
+        });
+        </script>
+        <input type="hidden" name="gps_coords">
+        """, height=0)
+        gps_input = st.text_input("", key="gps_coords", label_visibility="collapsed")
+        if gps_input:
+            lat, lon = map(float, gps_input.split(","))
+            geocode_url = f"https://api.mapbox.com/geocoding/v5/mapbox.places/{lon},{lat}.json?access_token={MAPBOX_TOKEN}"
+            res = requests.get(geocode_url)
+            place = res.json()["features"][0]["place_name"]
+            st.session_state.start_address = place
+    else:
+        start_input = st.text_input("Type to search start location", key="start")
+        if start_input:
+            st.session_state.start_address = start_input
+            suggestions = requests.get(f"https://api.mapbox.com/geocoding/v5/mapbox.places/{urllib.parse.quote(start_input)}.json?access_token={MAPBOX_TOKEN}").json()
+            if suggestions.get("features"):
+                for feature in suggestions["features"][:5]:
+                    if st.button("📍 " + feature["place_name"], key=feature["id"]):
+                        st.session_state.start_address = feature["place_name"]
     truck_height = float(st.text_input("Truck Height (in feet)", "13.5"))
+
 with col2:
     st.markdown("**Destination**")
-    end = st.text_input("", key="end", label_visibility="collapsed")
-    st.session_state.end_address = end
+    end_input = st.text_input("Type to search destination", key="end")
+    if end_input:
+        st.session_state.end_address = end_input
+        suggestions = requests.get(f"https://api.mapbox.com/geocoding/v5/mapbox.places/{urllib.parse.quote(end_input)}.json?access_token={MAPBOX_TOKEN}").json()
+        if suggestions.get("features"):
+            for feature in suggestions["features"][:5]:
+                if st.button("📍 " + feature["place_name"], key=feature["id"]):
+                    st.session_state.end_address = feature["place_name"]
     truck_weight = st.text_input("Truck Weight (in tons)", "20")
 
 # ==========================
