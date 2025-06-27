@@ -15,69 +15,39 @@ if "start_address" not in st.session_state:
 if "end_address" not in st.session_state:
     st.session_state.end_address = ""
 
-# Custom autocomplete UI using JS
-st.components.v1.html(f"""
-<script>
-window.addEventListener("message", (event) => {{
-    if (event.data.type === "start_selected") {{
-        window.parent.postMessage({{type: "streamlit:setComponentValue", value: {{ start: event.data.value }} }}, "*");
-    }}
-    if (event.data.type === "end_selected") {{
-        window.parent.postMessage({{type: "streamlit:setComponentValue", value: {{ end: event.data.value }} }}, "*");
-    }}
-}});
-</script>
-""", height=0)
-
 st.subheader("Enter Route and Truck Info")
 col1, col2 = st.columns(2)
 
 with col1:
     st.markdown("**Start Location**")
-    components.html(f"""
-    <input id='startInput' placeholder='Type start location...' style='width:100%;padding:10px;font-size:16px;'>
-    <div id='startResults' style='border:1px solid #ccc;max-height:150px;overflow-y:auto;background:white;'></div>
-    <script>
-    const startInput = document.getElementById('startInput');
-    const startResults = document.getElementById('startResults');
-    startInput.addEventListener('input', async () => {{
-        const val = startInput.value;
-        if (val.length < 3) return startResults.innerHTML = "";
-        const res = await fetch(`https://api.mapbox.com/geocoding/v5/mapbox.places/${{encodeURIComponent(val)}}.json?access_token={MAPBOX_TOKEN}`);
-        const data = await res.json();
-        startResults.innerHTML = data.features.map(f => `<div onclick='selectStart("${{f.place_name.replace(/"/g, "&quot;")}}")' style='padding:8px;border-bottom:1px solid #eee;cursor:pointer;'>📍 ${{f.place_name}}</div>`).join('');
-    }});
-    function selectStart(place) {{
-        startInput.value = place;
-        startResults.innerHTML = "";
-        window.parent.postMessage({{type: 'start_selected', value: place}}, '*');
-    }}
-    </script>
-    """, height=200)
+    start_input = st.text_input("Start Address", st.session_state.start_address)
+    if start_input != st.session_state.start_address:
+        st.session_state.start_address = start_input
+
+    if len(start_input) > 2:
+        res = requests.get(f"https://api.mapbox.com/geocoding/v5/mapbox.places/{urllib.parse.quote(start_input)}.json",
+                           params={"access_token": MAPBOX_TOKEN})
+        for feature in res.json().get("features", [])[:5]:
+            if st.button(f"📍 {feature['place_name']}", key="start_" + feature['id']):
+                st.session_state.start_address = feature['place_name']
+                st.experimental_rerun()
+
     truck_height = float(st.text_input("Truck Height (feet)", "13.5"))
 
 with col2:
     st.markdown("**Destination**")
-    components.html(f"""
-    <input id='endInput' placeholder='Type destination...' style='width:100%;padding:10px;font-size:16px;'>
-    <div id='endResults' style='border:1px solid #ccc;max-height:150px;overflow-y:auto;background:white;'></div>
-    <script>
-    const endInput = document.getElementById('endInput');
-    const endResults = document.getElementById('endResults');
-    endInput.addEventListener('input', async () => {{
-        const val = endInput.value;
-        if (val.length < 3) return endResults.innerHTML = "";
-        const res = await fetch(`https://api.mapbox.com/geocoding/v5/mapbox.places/${{encodeURIComponent(val)}}.json?access_token={MAPBOX_TOKEN}`);
-        const data = await res.json();
-        endResults.innerHTML = data.features.map(f => `<div onclick='selectEnd("${{f.place_name.replace(/"/g, "&quot;")}}")' style='padding:8px;border-bottom:1px solid #eee;cursor:pointer;'>📍 ${{f.place_name}}</div>`).join('');
-    }});
-    function selectEnd(place) {{
-        endInput.value = place;
-        endResults.innerHTML = "";
-        window.parent.postMessage({{type: 'end_selected', value: place}}, '*');
-    }}
-    </script>
-    """, height=200)
+    end_input = st.text_input("End Address", st.session_state.end_address)
+    if end_input != st.session_state.end_address:
+        st.session_state.end_address = end_input
+
+    if len(end_input) > 2:
+        res = requests.get(f"https://api.mapbox.com/geocoding/v5/mapbox.places/{urllib.parse.quote(end_input)}.json",
+                           params={"access_token": MAPBOX_TOKEN})
+        for feature in res.json().get("features", [])[:5]:
+            if st.button(f"📍 {feature['place_name']}", key="end_" + feature['id']):
+                st.session_state.end_address = feature['place_name']
+                st.experimental_rerun()
+
     truck_weight = st.text_input("Truck Weight (tons)", "20")
 
 # ==========================
