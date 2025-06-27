@@ -163,7 +163,7 @@ if start and end:
             st.success("✅ Route created! Scroll down to begin.")
 
             # 🗺️ Render Map
-            components.html(f"""
+            map_html = f"""
             <div id='map' style='height: 600px;'></div>
             <script src='https://api.mapbox.com/mapbox-gl-js/v2.15.0/mapbox-gl.js'></script>
             <link href='https://api.mapbox.com/mapbox-gl-js/v2.15.0/mapbox-gl.css' rel='stylesheet' />
@@ -191,7 +191,8 @@ if start and end:
                 new mapboxgl.Marker({{ color: 'red' }}).setLngLat([{end_coords[0]}, {end_coords[1]}]).addTo(map);
             }});
             </script>
-            """, height=620)
+            """
+            components.html(map_html, height=620)
 
     except Exception as e:
         st.error(f"❌ Exception occurred: {e}")
