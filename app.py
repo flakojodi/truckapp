@@ -15,43 +15,77 @@ if "start_address" not in st.session_state:
 if "end_address" not in st.session_state:
     st.session_state.end_address = ""
 
-# ========================== UI ==========================
+# Custom autocomplete UI using JS
+st.components.v1.html(f"""
+<script>
+window.addEventListener("message", (event) => {{
+    if (event.data.type === "start_selected") {{
+        window.parent.postMessage({{type: "streamlit:setComponentValue", value: {{ start: event.data.value }} }}, "*");
+    }}
+    if (event.data.type === "end_selected") {{
+        window.parent.postMessage({{type: "streamlit:setComponentValue", value: {{ end: event.data.value }} }}, "*");
+    }}
+}});
+</script>
+""", height=0)
+
 st.subheader("Enter Route and Truck Info")
 col1, col2 = st.columns(2)
 
-# 📍 Start address with autocomplete
 with col1:
     st.markdown("**Start Location**")
-    start_query = st.text_input("Start Address", st.session_state.start_address)
-    if len(start_query) > 2:
-        res = requests.get(
-            f"https://api.mapbox.com/geocoding/v5/mapbox.places/{urllib.parse.quote(start_query)}.json",
-            params={"access_token": MAPBOX_TOKEN})
-        for feature in res.json().get("features", [])[:5]:
-            if st.button(f"📍 {feature['place_name']}", key="start_" + feature['id']):
-                st.session_state.start_address = feature['place_name']
-                start_query = feature['place_name']
+    components.html(f"""
+    <input id='startInput' placeholder='Type start location...' style='width:100%;padding:10px;font-size:16px;'>
+    <div id='startResults' style='border:1px solid #ccc;max-height:150px;overflow-y:auto;background:white;'></div>
+    <script>
+    const startInput = document.getElementById('startInput');
+    const startResults = document.getElementById('startResults');
+    startInput.addEventListener('input', async () => {{
+        const val = startInput.value;
+        if (val.length < 3) return startResults.innerHTML = "";
+        const res = await fetch(`https://api.mapbox.com/geocoding/v5/mapbox.places/${{encodeURIComponent(val)}}.json?access_token={MAPBOX_TOKEN}`);
+        const data = await res.json();
+        startResults.innerHTML = data.features.map(f => `<div onclick='selectStart("${{f.place_name.replace(/"/g, "&quot;")}}")' style='padding:8px;border-bottom:1px solid #eee;cursor:pointer;'>📍 ${{f.place_name}}</div>`).join('');
+    }});
+    function selectStart(place) {{
+        startInput.value = place;
+        startResults.innerHTML = "";
+        window.parent.postMessage({{type: 'start_selected', value: place}}, '*');
+    }}
+    </script>
+    """, height=200)
     truck_height = float(st.text_input("Truck Height (feet)", "13.5"))
 
-# 🏁 End address with autocomplete
 with col2:
     st.markdown("**Destination**")
-    end_query = st.text_input("End Address", st.session_state.end_address)
-    if len(end_query) > 2:
-        res = requests.get(
-            f"https://api.mapbox.com/geocoding/v5/mapbox.places/{urllib.parse.quote(end_query)}.json",
-            params={"access_token": MAPBOX_TOKEN})
-        for feature in res.json().get("features", [])[:5]:
-            if st.button(f"📍 {feature['place_name']}", key="end_" + feature['id']):
-                st.session_state.end_address = feature['place_name']
-                end_query = feature['place_name']
+    components.html(f"""
+    <input id='endInput' placeholder='Type destination...' style='width:100%;padding:10px;font-size:16px;'>
+    <div id='endResults' style='border:1px solid #ccc;max-height:150px;overflow-y:auto;background:white;'></div>
+    <script>
+    const endInput = document.getElementById('endInput');
+    const endResults = document.getElementById('endResults');
+    endInput.addEventListener('input', async () => {{
+        const val = endInput.value;
+        if (val.length < 3) return endResults.innerHTML = "";
+        const res = await fetch(`https://api.mapbox.com/geocoding/v5/mapbox.places/${{encodeURIComponent(val)}}.json?access_token={MAPBOX_TOKEN}`);
+        const data = await res.json();
+        endResults.innerHTML = data.features.map(f => `<div onclick='selectEnd("${{f.place_name.replace(/"/g, "&quot;")}}")' style='padding:8px;border-bottom:1px solid #eee;cursor:pointer;'>📍 ${{f.place_name}}</div>`).join('');
+    }});
+    function selectEnd(place) {{
+        endInput.value = place;
+        endResults.innerHTML = "";
+        window.parent.postMessage({{type: 'end_selected', value: place}}, '*');
+    }}
+    </script>
+    """, height=200)
     truck_weight = st.text_input("Truck Weight (tons)", "20")
 
-# ========================== Geocode + Routing ==========================
+# ==========================
+# Geocode + Safety Check
+# ==========================
 def geocode(address):
-    res = requests.get(
-        f"https://api.mapbox.com/geocoding/v5/mapbox.places/{urllib.parse.quote(address)}.json",
-        params={"access_token": MAPBOX_TOKEN})
+    res = requests.get(f"https://api.mapbox.com/geocoding/v5/mapbox.places/{urllib.parse.quote(address)}.json",
+                       params={"access_token": MAPBOX_TOKEN})
     return res.json()["features"][0]["center"]
 
 def is_route_safe(steps, max_height):
@@ -67,11 +101,16 @@ def is_route_safe(steps, max_height):
                 return False
     return True
 
-# ========================== Show Route & Map ==========================
-if st.session_state.start_address and st.session_state.end_address:
+# ==========================
+# Route Generation
+# ==========================
+start = st.session_state.get("start_address")
+end = st.session_state.get("end_address")
+
+if start and end:
     try:
-        start_coords = geocode(st.session_state.start_address)
-        end_coords = geocode(st.session_state.end_address)
+        start_coords = geocode(start)
+        end_coords = geocode(end)
 
         url = f"https://api.mapbox.com/directions/v5/mapbox/driving/{start_coords[0]},{start_coords[1]};{end_coords[0]},{end_coords[1]}"
         params = {
@@ -94,7 +133,6 @@ if st.session_state.start_address and st.session_state.end_address:
                 "type": "FeatureCollection",
                 "features": [{"type": "Feature", "geometry": geometry, "properties": {}}]
             }
-
             components.html(f"""
             <div id='map' style='height: 600px;'></div>
             <script src='https://api.mapbox.com/mapbox-gl-js/v2.15.0/mapbox-gl.js'></script>
@@ -121,6 +159,5 @@ if st.session_state.start_address and st.session_state.end_address:
             }});
             </script>
             """, height=620)
-
     except Exception as e:
-        st.error(f"❌ Error loading route: {e}")
+        st.error(f"❌ Error generating route: {e}")
