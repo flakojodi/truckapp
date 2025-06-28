@@ -102,11 +102,10 @@ function selectEnd(val) {{
 </script>
 """
 
-start_box.components.v1.html(start_html, height=220)
-end_box.components.v1.html(end_html, height=220)
+start_box.html(start_html, height=220)
+end_box.html(end_html, height=220)
 
-# Handle JS inputs from iframe
-st_js_listener = components.html("""
+components.html("""
 <script>
 window.addEventListener("message", event => {
   if (event.data.type === "start") {{
