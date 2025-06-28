@@ -24,7 +24,6 @@ with col1:
 with col2:
     truck_weight = st.text_input("Truck Weight (in tons)", "20")
 
-# JavaScript-enhanced Autocomplete Input Fields
 st.markdown("""
 <style>
 input[type="text"] {
@@ -52,7 +51,6 @@ start_html = f"""
 <script>
 let startField = document.getElementById('startInput');
 let startContainer = document.getElementById('startSuggestions');
-
 function getStartSuggestions() {{
     let query = startField.value;
     if (query.length < 3) {{ startContainer.innerHTML = ''; return; }}
@@ -62,7 +60,6 @@ function getStartSuggestions() {{
         startContainer.innerHTML = data.features.map(f => `<div class='suggestion' onclick='selectStart("${{f.place_name}}")'>📍 ${{f.place_name}}</div>`).join('');
       }});
 }}
-
 function selectStart(val) {{
     window.parent.postMessage({{ isStreamlitMessage: true, type: "streamlit:setComponentValue", value: {{ key: "start_address", value: val }} }}, "*");
     startField.value = val;
@@ -78,7 +75,6 @@ end_html = f"""
 <script>
 let endField = document.getElementById('endInput');
 let endContainer = document.getElementById('endSuggestions');
-
 function getEndSuggestions() {{
     let query = endField.value;
     if (query.length < 3) {{ endContainer.innerHTML = ''; return; }}
@@ -88,7 +84,6 @@ function getEndSuggestions() {{
         endContainer.innerHTML = data.features.map(f => `<div class='suggestion' onclick='selectEnd("${{f.place_name}}")'>📍 ${{f.place_name}}</div>`).join('');
       }});
 }}
-
 function selectEnd(val) {{
     window.parent.postMessage({{ isStreamlitMessage: true, type: "streamlit:setComponentValue", value: {{ key: "end_address", value: val }} }}, "*");
     endField.value = val;
@@ -99,7 +94,6 @@ function selectEnd(val) {{
 
 components.html(start_html, height=240)
 components.html(end_html, height=240)
-
 components.html("""
 <script>
 window.addEventListener("message", event => {
@@ -113,9 +107,6 @@ window.addEventListener("message", event => {
 </script>
 """, height=0)
 
-# ==========================
-# Geocode Function
-# ==========================
 def geocode(address):
     url = f"https://api.mapbox.com/geocoding/v5/mapbox.places/{urllib.parse.quote(address)}.json"
     params = {"access_token": MAPBOX_TOKEN}
@@ -124,9 +115,6 @@ def geocode(address):
     coords = data["features"][0]["center"]
     return coords
 
-# ==========================
-# Bridge Safety Check
-# ==========================
 def is_route_safe(steps, max_height_ft):
     low_bridges = [
         {"location": [-87.6244, 41.8808], "clearance_ft": 12.5},
@@ -140,9 +128,6 @@ def is_route_safe(steps, max_height_ft):
                 return False
     return True
 
-# ==========================
-# Route Generator
-# ==========================
 start = st.session_state.get("start_address", "")
 end = st.session_state.get("end_address", "")
 
@@ -166,40 +151,47 @@ if st.button("🚚 Get Directions") and start and end:
         if not is_route_safe(steps, truck_height):
             st.error("🚫 Route includes a low-clearance bridge for your truck height!")
         else:
-            route_geo = {
+            route_geo = json.dumps({
                 "type": "FeatureCollection",
                 "features": [{
                     "type": "Feature",
                     "geometry": data["routes"][0]["geometry"],
                     "properties": {}
                 }]
-            }
+            })
             st.success("✅ Route is safe. Preview below:")
-            components.html(f"""
+
+            map_html = f"""
             <div id='map' style='height: 600px;'></div>
             <script src='https://api.mapbox.com/mapbox-gl-js/v2.15.0/mapbox-gl.js'></script>
             <link href='https://api.mapbox.com/mapbox-gl-js/v2.15.0/mapbox-gl.css' rel='stylesheet' />
             <script>
-            mapboxgl.accessToken = '{MAPBOX_TOKEN}';
-            const map = new mapboxgl.Map({{
-                container: 'map',
-                style: 'mapbox://styles/mapbox/navigation-night-v1',
-                center: [{start_coords[0]}, {start_coords[1]}],
-                zoom: 12
-            }});
-            map.on('load', () => {{
-                map.addSource('route', {{ type: 'geojson', data: {json.dumps(route_geo)} }});
-                map.addLayer({{
+            window.onload = function () {{
+              setTimeout(function() {{
+                mapboxgl.accessToken = '{MAPBOX_TOKEN}';
+                const map = new mapboxgl.Map({{
+                  container: 'map',
+                  style: 'mapbox://styles/mapbox/navigation-night-v1',
+                  center: [{start_coords[0]}, {start_coords[1]}],
+                  zoom: 13
+                }});
+                map.on('load', function () {{
+                  map.addSource('route', {{ type: 'geojson', data: {route_geo} }});
+                  map.addLayer({{
                     id: 'route-line',
                     type: 'line',
                     source: 'route',
                     layout: {{ 'line-join': 'round', 'line-cap': 'round' }},
                     paint: {{ 'line-color': '#00FF99', 'line-width': 6 }}
+                  }});
+                  new mapboxgl.Marker().setLngLat([{start_coords[0]}, {start_coords[1]}]).addTo(map);
+                  new mapboxgl.Marker({{ color: 'red' }}).setLngLat([{end_coords[0]}, {end_coords[1]}]).addTo(map);
                 }});
-                new mapboxgl.Marker().setLngLat([{start_coords[0]}, {start_coords[1]}]).addTo(map);
-                new mapboxgl.Marker({{ color: 'red' }}).setLngLat([{end_coords[0]}, {end_coords[1]}]).addTo(map);
-            }});
+              }}, 500);
+            }};
             </script>
-            """, height=620)
+            """
+            components.html(map_html, height=640)
+
     except Exception as e:
         st.error(f"Error: {e}")
