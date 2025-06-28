@@ -1,7 +1,6 @@
 import streamlit as st
 import json
 import requests
-import os
 import urllib.parse
 import streamlit.components.v1 as components
 from datetime import datetime, timedelta
@@ -25,7 +24,7 @@ with col1:
 with col2:
     truck_weight = st.text_input("Truck Weight (in tons)", "20")
 
-# JavaScript-enhanced Autocomplete Component
+# JavaScript-enhanced Autocomplete Input Fields
 st.markdown("""
 <style>
 input[type="text"] {
@@ -46,13 +45,8 @@ input[type="text"] {
 </style>
 """, unsafe_allow_html=True)
 
-st.markdown("**Start Location**")
-start_box = st.empty()
-end_box = st.empty()
-
-gps_input = st.text_input("Current GPS (for debug, optional)", key="gps_coords", label_visibility="collapsed")
-
 start_html = f"""
+<h4>Start Location</h4>
 <input type='text' id='startInput' placeholder='Start address...' oninput='getStartSuggestions()'>
 <div id='startSuggestions'></div>
 <script>
@@ -70,7 +64,7 @@ function getStartSuggestions() {{
 }}
 
 function selectStart(val) {{
-    window.parent.postMessage({{ isStreamlitMessage: true, type: "start", value: val }}, "*");
+    window.parent.postMessage({{ isStreamlitMessage: true, type: "streamlit:setComponentValue", value: {{ key: "start_address", value: val }} }}, "*");
     startField.value = val;
     startContainer.innerHTML = "";
 }}
@@ -78,6 +72,7 @@ function selectStart(val) {{
 """
 
 end_html = f"""
+<h4>Destination</h4>
 <input type='text' id='endInput' placeholder='End address...' oninput='getEndSuggestions()'>
 <div id='endSuggestions'></div>
 <script>
@@ -95,31 +90,31 @@ function getEndSuggestions() {{
 }}
 
 function selectEnd(val) {{
-    window.parent.postMessage({{ isStreamlitMessage: true, type: "end", value: val }}, "*");
+    window.parent.postMessage({{ isStreamlitMessage: true, type: "streamlit:setComponentValue", value: {{ key: "end_address", value: val }} }}, "*");
     endField.value = val;
     endContainer.innerHTML = "";
 }}
 </script>
 """
 
-start_box.html(start_html, height=220)
-end_box.html(end_html, height=220)
+components.html(start_html, height=240)
+components.html(end_html, height=240)
 
 components.html("""
 <script>
 window.addEventListener("message", event => {
-  if (event.data.type === "start") {{
-    window.parent.postMessage({ isStreamlitMessage: true, type: "streamlit:setComponentValue", value: {{ key: "start_address", value: event.data.value }} }, "*");
-  }}
-  if (event.data.type === "end") {{
-    window.parent.postMessage({ isStreamlitMessage: true, type: "streamlit:setComponentValue", value: {{ key: "end_address", value: event.data.value }} }, "*");
-  }}
+  if (event.data.type === "start") {
+    window.parent.postMessage({ isStreamlitMessage: true, type: "streamlit:setComponentValue", value: { key: "start_address", value: event.data.value } }, "*");
+  }
+  if (event.data.type === "end") {
+    window.parent.postMessage({ isStreamlitMessage: true, type: "streamlit:setComponentValue", value: { key: "end_address", value: event.data.value } }, "*");
+  }
 });
 </script>
 """, height=0)
 
 # ==========================
-# 🌐 Geocode Function
+# Geocode Function
 # ==========================
 def geocode(address):
     url = f"https://api.mapbox.com/geocoding/v5/mapbox.places/{urllib.parse.quote(address)}.json"
@@ -130,7 +125,7 @@ def geocode(address):
     return coords
 
 # ==========================
-# 🚧 Simulated Bridge Height Check
+# Bridge Safety Check
 # ==========================
 def is_route_safe(steps, max_height_ft):
     low_bridges = [
@@ -146,7 +141,7 @@ def is_route_safe(steps, max_height_ft):
     return True
 
 # ==========================
-# 📦 Generate Route
+# Route Generator
 # ==========================
 start = st.session_state.get("start_address", "")
 end = st.session_state.get("end_address", "")
@@ -179,13 +174,32 @@ if st.button("🚚 Get Directions") and start and end:
                     "properties": {}
                 }]
             }
-            with open("route.json", "w") as f:
-                json.dump(route_geo, f)
-            with open("steps.json", "w") as f:
-                json.dump(steps, f)
-
-            st.success("✅ Route generated! Map below:")
-
-            st.map({"type": "scattermapbox", "coordinates": [start_coords, end_coords]})
+            st.success("✅ Route is safe. Preview below:")
+            components.html(f"""
+            <div id='map' style='height: 600px;'></div>
+            <script src='https://api.mapbox.com/mapbox-gl-js/v2.15.0/mapbox-gl.js'></script>
+            <link href='https://api.mapbox.com/mapbox-gl-js/v2.15.0/mapbox-gl.css' rel='stylesheet' />
+            <script>
+            mapboxgl.accessToken = '{MAPBOX_TOKEN}';
+            const map = new mapboxgl.Map({{
+                container: 'map',
+                style: 'mapbox://styles/mapbox/navigation-night-v1',
+                center: [{start_coords[0]}, {start_coords[1]}],
+                zoom: 12
+            }});
+            map.on('load', () => {{
+                map.addSource('route', {{ type: 'geojson', data: {json.dumps(route_geo)} }});
+                map.addLayer({{
+                    id: 'route-line',
+                    type: 'line',
+                    source: 'route',
+                    layout: {{ 'line-join': 'round', 'line-cap': 'round' }},
+                    paint: {{ 'line-color': '#00FF99', 'line-width': 6 }}
+                }});
+                new mapboxgl.Marker().setLngLat([{start_coords[0]}, {start_coords[1]}]).addTo(map);
+                new mapboxgl.Marker({{ color: 'red' }}).setLngLat([{end_coords[0]}, {end_coords[1]}]).addTo(map);
+            }});
+            </script>
+            """, height=620)
     except Exception as e:
         st.error(f"Error: {e}")
